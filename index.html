@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>infini</title>
 <style>
-     * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @property --iris {
+      syntax: '<percentage>';
+      inherits: false;
+      initial-value: 150%;
+    }
 
     body {
       background: #000;
@@ -19,20 +25,62 @@
       padding-bottom: 96px;
       }
 
+    .splash {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #000;
+      pointer-events: none;
+      z-index: 2000;
+      animation: splashFade 3.2s ease forwards;
+    }
+
+    .splash.is-hidden {
+      display: none;
+    }
+
+    .splash-mark {
+      color: #fff;
+      font-size: clamp(84px, 16vw, 220px);
+      font-weight: 800;
+      line-height: 1;
+      opacity: 0;
+      animation: splashMark 2.9s ease forwards;
+    }
+
+    @keyframes splashFade {
+      0%, 68% { opacity: 1; visibility: visible; }
+      100% { opacity: 0; visibility: hidden; }
+    }
+
+    @keyframes splashMark {
+      0% { opacity: 0; transform: scale(.96); }
+      24%, 72% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.025); }
+    }
+
     /* top bar */
     .top-bar {
       width: 100%;
       max-width: 1280px;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       padding: 44px 48px 0;
       position: relative;
+      z-index: 600;
+      }
+
+    .title-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
       }
 
     .brand {
       color: rgba(255,255,255,.88);
-      font-size: 22px;
+      font-size: 34px;
       font-weight: 500;
       letter-spacing: .2px;
       line-height: 1;
@@ -40,41 +88,120 @@
 
     .top-controls {
       display: flex;
-      align-items: center;
-      gap: 10px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 9px;
       }
+
+    .prompt-dock {
+      position: absolute;
+      top: 44px;
+      left: 50%;
+      width: min(48vw, 540px);
+      transform: translateX(-50%);
+      transition: opacity .35s ease;
+      }
+
+    .prompt-input {
+      width: 100%;
+      appearance: none;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid rgba(255,255,255,.18);
+      border-radius: 0;
+      color: rgba(255,255,255,.92);
+      font: inherit;
+      font-size: 18px;
+      font-weight: 400;
+      line-height: 1.35;
+      outline: none;
+      padding: 0 0 9px;
+      transition: border-color .25s ease, color .25s ease;
+    }
+
+    .prompt-input::placeholder {
+      color: rgba(255,255,255,.36);
+    }
+
+    .prompt-input:focus {
+      border-color: rgba(255,255,255,.58);
+      color: #fff;
+    }
+
+    .prompt-input:read-only {
+      cursor: default;
+      opacity: .62;
+    }
+
+    .active-prompt {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom) + 12px);
+      max-width: min(78vw, 760px);
+      color: rgba(255,255,255,.72);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: .2px;
+      line-height: 1.35;
+      opacity: 0;
+      overflow: hidden;
+      pointer-events: none;
+      text-align: center;
+      text-overflow: ellipsis;
+      text-shadow: 0 2px 18px rgba(0,0,0,.68);
+      transform: translateX(-50%);
+      transition: opacity .45s ease;
+      white-space: nowrap;
+      z-index: 700;
+    }
+
+    body.is-running .prompt-dock {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.is-running .active-prompt {
+      opacity: 1;
+    }
 
     .play-btn,
-    .reset-btn {
-      border: 1px solid rgba(255,255,255,.18);
-      border-radius: 999px;
-      background: rgba(0,0,0,.36);
+    .reset-btn,
+    .gallery-btn,
+    .fill-btn {
+      appearance: none;
+      background: none;
+      border: none;
       color: #fff;
       cursor: pointer;
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: .3px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: .2px;
       line-height: 1;
-      padding: 15px 28px;
+      opacity: .52;
+      padding: 0;
       text-transform: lowercase;
       z-index: 500;
-      transition: background .25s ease, border-color .25s ease, opacity .25s ease;
-      }
-
-    .reset-btn {
-      opacity: .48;
-      padding: 15px 22px;
-      }
-
-    .reset-btn:hover {
-      opacity: 1;
+      transition: opacity .25s ease;
       }
 
     .play-btn:hover,
-    .play-btn.is-playing {
-      background: rgba(255,255,255,.95);
-      border-color: rgba(255,255,255,.95);
-      color: #000;
+    .play-btn.is-playing,
+    .reset-btn:hover,
+    .gallery-btn:hover,
+    .gallery-btn.is-active {
+      opacity: 1;
+      }
+
+    .fill-btn {
+      font-size: 24px;
+      line-height: .8;
+      opacity: .82;
+    }
+
+    .fill-btn.is-active,
+    .fill-btn:hover {
+      opacity: 1;
       }
 
     /* ── image area ── */
@@ -82,6 +209,7 @@
       width: 100%;
       max-width: 1280px;
       aspect-ratio: 16 / 9;
+      margin-top: clamp(46px, 6vh, 90px);
       border-radius: 10px;
       overflow: hidden;
       position: relative;
@@ -89,24 +217,114 @@
       transition: opacity .7s ease;
       }
 
-    .image-wrap img {
+    .main-img {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
       opacity: 0;
-      transform: translateX(0) scale(1);
-      transition: opacity 1.1s ease, transform 1.1s cubic-bezier(.2,.7,.2,1);
+      transform: scale(1.018);
+      z-index: 1;
       }
 
-    .image-wrap img.enter-right {
-      transform: translateX(34px) scale(1.015);
-      }
-
-    .image-wrap img.loaded {
+    .main-img.is-visible {
       opacity: 1;
-      transform: translateX(0) scale(1);
+      transform: scale(1);
       }
+
+    .main-img.is-entering {
+      --iris: 0%;
+      opacity: 1;
+      z-index: 3;
+      -webkit-mask-image:
+        radial-gradient(circle at center,
+          #000 0%,
+          #000 max(0%, calc(var(--iris) - 34%)),
+          rgba(0,0,0,.78) calc(var(--iris) - 16%),
+          transparent var(--iris));
+      mask-image:
+        radial-gradient(circle at center,
+          #000 0%,
+          #000 max(0%, calc(var(--iris) - 34%)),
+          rgba(0,0,0,.78) calc(var(--iris) - 16%),
+          transparent var(--iris));
+      animation: irisReveal 6.4s cubic-bezier(.16,.74,.18,1) forwards;
+      }
+
+    .main-img.is-exiting {
+      opacity: 1;
+      z-index: 2;
+      animation: softRelease 6.4s ease forwards;
+      }
+
+    .image-wrap.is-transitioning::after {
+      content: '';
+      position: absolute;
+      inset: -18%;
+      background:
+        radial-gradient(circle at center,
+          rgba(255,255,255,.24) 0%,
+          rgba(255,255,255,.11) 18%,
+          rgba(255,255,255,0) 58%);
+      mix-blend-mode: soft-light;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 4;
+      animation: transitionVeil 6.4s ease forwards;
+      }
+
+    @keyframes irisReveal {
+      0% {
+        --iris: 0%;
+        filter: blur(18px) saturate(.9);
+        opacity: 0;
+        transform: scale(1.035);
+      }
+      18% {
+        opacity: .52;
+      }
+      68% {
+        filter: blur(1px) saturate(1);
+      }
+      100% {
+        --iris: 150%;
+        filter: blur(0);
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes softRelease {
+      0% {
+        filter: blur(0);
+        opacity: 1;
+        transform: scale(1);
+      }
+      52% {
+        opacity: .82;
+      }
+      100% {
+        filter: blur(14px);
+        opacity: 0;
+        transform: scale(1.012);
+      }
+    }
+
+    @keyframes transitionVeil {
+      0% {
+        opacity: 0;
+        transform: scale(.46);
+      }
+      34% {
+        opacity: .22;
+      }
+      100% {
+        opacity: 0;
+        transform: scale(1.28);
+      }
+    }
 
     .image-wrap .placeholder {
       position: absolute;
@@ -147,11 +365,15 @@
       width: min(76vw, 820px);
       height: 172px;
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       justify-content: center;
       transform: translateX(-50%);
       z-index: 100;
       pointer-events: none;
+      }
+
+    .carousel-track.hidden {
+      display: none !important;
       }
 
     .carousel-inner {
@@ -166,12 +388,12 @@
     .carousel-viewport {
       position: absolute;
       left: 50%;
-      bottom: 0;
+      top: 50%;
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       justify-content: center;
       gap: 6px;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%);
       transition: transform .42s cubic-bezier(.25,.1,.25,1);
       will-change: transform;
       }
@@ -185,7 +407,7 @@
       cursor: pointer;
       opacity: .72;
       position: relative;
-      transform-origin: center bottom;
+      transform-origin: center center;
       box-shadow: 0 10px 26px rgba(0,0,0,.42);
       transition:
         width .42s cubic-bezier(.25,.1,.25,1),
@@ -235,16 +457,15 @@
       }
 
     .thumb.near {
-      width: 96px;
-      height: 96px;
+      width: 98px;
+      height: 98px;
       opacity: .9;
       }
 
     .thumb.selected {
-      width: 142px;
-      height: 142px;
+      width: 122px;
+      height: 122px;
       opacity: 1;
-      transform: translateY(-6px);
       box-shadow: 0 18px 46px rgba(0,0,0,.62);
       }
     .thumb.selected::after {
@@ -282,24 +503,30 @@
     @keyframes popSelectedFromRight {
       0% {
         opacity: 0;
-        transform: translateX(96px) translateY(-6px) scale(.72);
+        transform: translateX(96px) scale(.72);
       }
       72% {
         opacity: 1;
-        transform: translateX(-10px) translateY(-6px) scale(1.04);
+        transform: translateX(-10px) scale(1.04);
       }
       100% {
-        transform: translateX(0) translateY(-6px) scale(1);
+        transform: translateX(0) scale(1);
       }
     }
 
     /* ── responsive ── */
     @media (max-width: 900px) {
       .top-bar { padding: 30px 20px 0; }
-      .brand { font-size: 20px; }
-      .top-controls { gap: 8px; }
-      .play-btn { padding: 13px 24px; }
-      .reset-btn { padding: 13px 18px; }
+      .brand { font-size: 30px; }
+      .title-stack { gap: 12px; }
+      .top-controls { gap: 9px; }
+      .prompt-dock {
+        top: 30px;
+        width: min(50vw, 420px);
+      }
+      .prompt-input {
+        font-size: 17px;
+      }
       .carousel-track {
         bottom: 28px;
         width: 88vw;
@@ -309,8 +536,8 @@
       .thumb.edge { width: 18px; height: 18px; }
       .thumb.far { width: 28px; height: 28px; }
       .thumb.mid { width: 48px; height: 48px; }
-      .thumb.near { width: 66px; height: 66px; }
-      .thumb.selected { width: 104px; height: 104px; }
+      .thumb.near { width: 72px; height: 72px; }
+      .thumb.selected { width: 88px; height: 88px; }
     }
 
     @media (max-width: 700px) {
@@ -330,18 +557,29 @@
         z-index: 600;
       }
 
+      .title-stack { gap: 12px; }
+
       .brand {
         text-shadow: 0 2px 16px rgba(0,0,0,.48);
       }
 
-      .play-btn {
-        background: rgba(0,0,0,.42);
-        box-shadow: 0 12px 34px rgba(0,0,0,.28);
+      .top-controls {
+        text-shadow: 0 2px 14px rgba(0,0,0,.6);
       }
 
-      .reset-btn {
-        background: rgba(0,0,0,.28);
-        box-shadow: 0 12px 34px rgba(0,0,0,.2);
+      .prompt-dock {
+        top: calc(env(safe-area-inset-top) + 18px);
+        width: min(44vw, 240px);
+      }
+
+      .prompt-input {
+        font-size: 16px;
+        text-shadow: 0 2px 14px rgba(0,0,0,.68);
+      }
+
+      .active-prompt {
+        max-width: 82vw;
+        font-size: 12px;
       }
 
       .image-wrap {
@@ -350,13 +588,14 @@
         width: 100vw;
         height: 100svh;
         height: 100dvh;
+        margin-top: 0;
         max-width: none;
         aspect-ratio: auto;
         border-radius: 0;
         z-index: 0;
       }
 
-      .image-wrap img {
+      .main-img {
         object-fit: cover;
       }
 
@@ -371,22 +610,61 @@
         height: 124px;
       }
     }
+
+    body.fill-mode .title-stack {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .35s ease;
+    }
+
+    body.fill-mode .image-wrap {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      max-width: none;
+      margin-top: 0;
+      aspect-ratio: auto;
+      border-radius: 0;
+      background: #000;
+      z-index: 0;
+    }
+
+    body.fill-mode .main-img {
+      object-fit: contain;
+      object-position: center center;
+    }
+
+    body.fill-mode .fill-btn { opacity: 1; }
 </style>
 </head>
 <body>
 
+<div class="splash" id="splash" aria-hidden="true">
+     <div class="splash-mark">∞</div>
+</div>
+
 <!-- top bar -->
 <div class="top-bar">
-     <div class="brand">infini</div>
-     <div class="top-controls">
-       <button class="reset-btn" id="resetBtn" type="button">reset</button>
-       <button class="play-btn" id="playBtn" type="button">play</button>
+     <div class="title-stack">
+       <div class="brand">infini</div>
+       <div class="top-controls">
+         <button class="play-btn" id="playBtn" type="button">play</button>
+         <button class="reset-btn" id="resetBtn" type="button">reset</button>
+         <button class="gallery-btn is-active" id="galleryBtn" type="button">gallery</button>
+       </div>
      </div>
+     <div class="prompt-dock">
+       <input class="prompt-input" id="promptInput" type="text" autocomplete="off" spellcheck="false" aria-label="Prompt" />
+     </div>
+     <button class="fill-btn" id="fillBtn" type="button" aria-label="Enter fullscreen">↗</button>
 </div>
 
 <!-- ── image area ── -->
 <div class="image-wrap" id="imageWrap">
-     <img id="mainImg" src="" alt="" />
+     <img class="main-img" id="mainImgA" src="" alt="" />
+     <img class="main-img" id="mainImgB" src="" alt="" />
      <div class="placeholder" id="placeholder"></div>
      <div class="spinner" id="spinner"><div class="spinner-ring"></div></div>
 </div>
@@ -398,20 +676,27 @@
      </div>
 </div>
 
+<div class="active-prompt" id="activePrompt"></div>
+
 <script>
 /* ═══════════════════════════════════════
    State & Config
    ═══════════════════════════════════════ */
-const PROMPT = 'Quantum art';
+const DEFAULT_PROMPT = 'Quantum Art 35mm Film';
+const PREVIOUS_DEFAULT_PROMPT = 'Quantum art';
 const API_STORAGE_KEY = 'infini_api_base';
+const PROMPT_STORAGE_KEY = 'infini_prompt';
 let COMFY_HOST = getComfyHost();
 let generations = [];          // { title, imgSrc, createdAt }
 let isGenerating = false;
 let isPlaying = false;
+let isGalleryVisible = true;
+let isFillMode = false;
 let currentGenerationIndex = -1;
 let generationRun = 0;
 let activePromptId = null;
 let latestPopIndex = -1;
+let currentRunPrompt = DEFAULT_PROMPT;
 
 /* ── persist to localStorage ── */
 function save() {
@@ -420,10 +705,27 @@ function save() {
 function load() {
   try { generations = JSON.parse(localStorage.getItem('infinite_gen') || '[]'); } catch { generations = []; }
   generations = generations.map((gen) => ({
-    title: gen.title || PROMPT,
+    title: gen.title || DEFAULT_PROMPT,
     imgSrc: normalizeImageSrc(gen.imgSrc),
     createdAt: gen.createdAt || Date.now()
   }));
+}
+
+function cleanPrompt(value) {
+  return (value || '').trim() || DEFAULT_PROMPT;
+}
+
+function loadPrompt() {
+  try {
+    const storedPrompt = cleanPrompt(localStorage.getItem(PROMPT_STORAGE_KEY));
+    return storedPrompt === PREVIOUS_DEFAULT_PROMPT ? DEFAULT_PROMPT : storedPrompt;
+  } catch {
+    return DEFAULT_PROMPT;
+  }
+}
+
+function savePrompt(value) {
+  try { localStorage.setItem(PROMPT_STORAGE_KEY, cleanPrompt(value)); } catch {}
 }
 
 function isPrivateHost(hostname) {
@@ -509,7 +811,8 @@ async function interruptGeneration() {
   } catch {}
 }
 
-async function generate(runId) {
+async function generate(runId, promptText) {
+  const prompt = cleanPrompt(promptText);
   const workflow = {
       "57:28": {             // UNETLoader
         "class_type": "UNETLoader",
@@ -550,7 +853,7 @@ async function generate(runId) {
       "58": {                // PrimitiveStringMultiline (prompt)
         "class_type": "PrimitiveStringMultiline",
         "inputs": {
-          "value": PROMPT
+          "value": prompt
         }
       },
       "57:27": {             // CLIPTextEncode (prompt)
@@ -660,39 +963,112 @@ async function generate(runId) {
    UI Flow
    ═══════════════════════════════════════ */
 
-const $mainImg      = document.getElementById('mainImg');
+const $imageWrap    = document.getElementById('imageWrap');
+const $imageLayers  = [
+  document.getElementById('mainImgA'),
+  document.getElementById('mainImgB')
+];
 const $placeholder  = document.getElementById('placeholder');
 const $spinner      = document.getElementById('spinner');
 const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
+const $galleryBtn   = document.getElementById('galleryBtn');
+const $fillBtn      = document.getElementById('fillBtn');
+const $promptInput  = document.getElementById('promptInput');
+const $activePrompt = document.getElementById('activePrompt');
+const $splash       = document.getElementById('splash');
 const $carouselTrack = document.getElementById('carouselTrack');
 const $carouselInner = document.getElementById('carouselInner');
 const $viewport     = document.getElementById('carouselViewport');
+let activeImageLayer = 0;
+let imageTransitionTimer = null;
 
-function loadMainImage(src, fromRight = false) {
+function getPromptText() {
+  const prompt = cleanPrompt($promptInput.value);
+  $promptInput.value = prompt;
+  savePrompt(prompt);
+  return prompt;
+}
+
+async function smokeTestBridge() {
+  if (!COMFY_HOST) return;
+
+  try {
+    await fetch(`${COMFY_HOST}/system_stats`, { cache: 'no-store' });
+  } catch (err) {
+    console.warn('[infini] bridge smoke test failed', err);
+  }
+}
+
+function finishSplash() {
+  if (!$splash) return;
+
+  setTimeout(() => {
+    $splash.classList.add('is-hidden');
+  }, 3400);
+}
+
+function clearImageTransitionTimer() {
+  if (imageTransitionTimer) {
+    clearTimeout(imageTransitionTimer);
+    imageTransitionTimer = null;
+  }
+}
+
+function resetImageLayer(layer) {
+  layer.onload = null;
+  layer.removeAttribute('src');
+  layer.className = 'main-img';
+}
+
+function loadMainImage(src) {
   const nextSrc = normalizeImageSrc(src);
   if (!nextSrc) return;
 
-  $mainImg.classList.remove('loaded');
-  $mainImg.classList.toggle('enter-right', fromRight);
-  $mainImg.onload = () => {
+  const currentLayer = $imageLayers[activeImageLayer];
+  if (currentLayer.getAttribute('src') === nextSrc && currentLayer.classList.contains('is-visible')) {
+    return;
+  }
+
+  clearImageTransitionTimer();
+
+  const nextLayerIndex = 1 - activeImageLayer;
+  const nextLayer = $imageLayers[nextLayerIndex];
+  const hasCurrentImage = Boolean(currentLayer.getAttribute('src'));
+
+  nextLayer.onload = () => {
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => $mainImg.classList.add('loaded'));
+      requestAnimationFrame(() => {
+        if (hasCurrentImage) {
+          currentLayer.className = 'main-img is-exiting';
+          $imageWrap.classList.add('is-transitioning');
+        } else {
+          currentLayer.className = 'main-img';
+          $imageWrap.classList.remove('is-transitioning');
+        }
+
+        nextLayer.className = hasCurrentImage ? 'main-img is-entering' : 'main-img is-visible';
+        activeImageLayer = nextLayerIndex;
+
+        imageTransitionTimer = setTimeout(() => {
+          nextLayer.className = 'main-img is-visible';
+          if (hasCurrentImage) resetImageLayer(currentLayer);
+          $imageWrap.classList.remove('is-transitioning');
+          imageTransitionTimer = null;
+        }, hasCurrentImage ? 6500 : 0);
+      });
     });
   };
-  $mainImg.src = nextSrc;
+  nextLayer.alt = currentRunPrompt;
+  nextLayer.src = nextSrc;
 
-  if ($mainImg.complete) {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => $mainImg.classList.add('loaded'));
-    });
-  }
+  if (nextLayer.complete) nextLayer.onload();
 }
 
 /* When image arrives from ComfyUI */
 function onImageReady(url) {
   const imgSrc = normalizeImageSrc(url);
-  generations.push({ title: PROMPT, imgSrc, createdAt: Date.now() });
+  generations.push({ title: currentRunPrompt, imgSrc, createdAt: Date.now() });
   latestPopIndex = generations.length - 1;
   save();
   isGenerating = false;
@@ -708,11 +1084,26 @@ function onImageReady(url) {
 }
 
 function updatePlayState() {
+  const isRunning = isPlaying || isGenerating;
+  document.body.classList.toggle('is-running', isRunning);
   $playBtn.classList.toggle('is-playing', isPlaying);
   $playBtn.setAttribute('aria-pressed', String(isPlaying));
-  $playBtn.textContent = isPlaying || isGenerating ? 'stop' : 'play';
-  $playBtn.setAttribute('aria-label', isPlaying || isGenerating ? 'Stop generation' : 'Start generation');
+  $playBtn.textContent = isRunning ? 'stop' : 'play';
+  $playBtn.setAttribute('aria-label', isRunning ? 'Stop generation' : 'Start generation');
+  $galleryBtn.classList.toggle('is-active', isGalleryVisible);
+  $galleryBtn.setAttribute('aria-pressed', String(isGalleryVisible));
+  $fillBtn.classList.toggle('is-active', isFillMode);
+  $fillBtn.setAttribute('aria-pressed', String(isFillMode));
+  $fillBtn.setAttribute('aria-label', isFillMode ? 'Exit fullscreen' : 'Enter fullscreen');
+  $promptInput.readOnly = isRunning;
+  $activePrompt.textContent = isRunning ? currentRunPrompt : '';
   $spinner.classList.toggle('show', isGenerating && generations.length === 0);
+  updateGalleryVisibility();
+}
+
+function updateGalleryVisibility() {
+  const shouldShow = generations.length > 0 && isGalleryVisible && !isFillMode;
+  $carouselTrack.classList.toggle('hidden', !shouldShow);
 }
 
 function startNextGeneration() {
@@ -720,7 +1111,7 @@ function startNextGeneration() {
 
   isGenerating = true;
   updatePlayState();
-  generate(generationRun);
+  generate(generationRun, currentRunPrompt);
 }
 
 function stopGeneration() {
@@ -736,6 +1127,7 @@ function resetLibrary() {
   generationRun++;
   isPlaying = false;
   isGenerating = false;
+  isGalleryVisible = true;
   activePromptId = null;
   latestPopIndex = -1;
   currentGenerationIndex = -1;
@@ -743,9 +1135,10 @@ function resetLibrary() {
 
   try { localStorage.removeItem('infinite_gen'); } catch {}
 
-  $mainImg.onload = null;
-  $mainImg.classList.remove('loaded', 'enter-right');
-  $mainImg.removeAttribute('src');
+  clearImageTransitionTimer();
+  $imageLayers.forEach(resetImageLayer);
+  activeImageLayer = 0;
+  $imageWrap.classList.remove('is-transitioning');
   $placeholder.textContent = '';
   renderCarousel();
   updatePlayState();
@@ -761,12 +1154,77 @@ $playBtn.addEventListener('click', () => {
   if (!ensureComfyHost()) return;
 
   generationRun++;
+  currentRunPrompt = getPromptText();
   isPlaying = true;
   updatePlayState();
   startNextGeneration();
 });
 
 $resetBtn.addEventListener('click', resetLibrary);
+
+$promptInput.addEventListener('change', () => savePrompt($promptInput.value));
+$promptInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    $promptInput.blur();
+    if (!isPlaying && !isGenerating) $playBtn.click();
+  }
+});
+
+function setGalleryVisible(isVisible) {
+  isGalleryVisible = isVisible;
+  updatePlayState();
+}
+
+function showLatestInFillMode() {
+  if (!isFillMode || generations.length === 0) return;
+  selectGeneration(generations.length - 1, false);
+}
+
+async function enterFillMode() {
+  isFillMode = true;
+  document.body.classList.add('fill-mode');
+  showLatestInFillMode();
+  updatePlayState();
+
+  try {
+    if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch {}
+}
+
+async function exitFillMode() {
+  isFillMode = false;
+  document.body.classList.remove('fill-mode');
+  updatePlayState();
+
+  try {
+    if (document.exitFullscreen && document.fullscreenElement) {
+      await document.exitFullscreen();
+    }
+  } catch {}
+}
+
+$galleryBtn.addEventListener('click', () => {
+  setGalleryVisible(!isGalleryVisible);
+});
+
+$fillBtn.addEventListener('click', () => {
+  if (isFillMode) {
+    exitFillMode();
+  } else {
+    enterFillMode();
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && isFillMode) {
+    isFillMode = false;
+    document.body.classList.remove('fill-mode');
+    updatePlayState();
+  }
+});
 
 /* ═══════════════════════════════════════
    Carousel
@@ -796,7 +1254,7 @@ function selectGeneration(index, shouldRender = true, fromRight = false) {
 
 function renderCarousel() {
      $viewport.innerHTML = '';
-     $viewport.style.transform = 'translateX(-50%)';
+     $viewport.style.transform = 'translate(-50%, -50%)';
 
   if (generations.length === 0) {
     $carouselTrack.style.display = 'none';
@@ -855,6 +1313,10 @@ function renderCarousel() {
 /* ═══════════════════════════════════════
    Init
    ═══════════════════════════════════════ */
+$promptInput.placeholder = DEFAULT_PROMPT;
+$promptInput.value = loadPrompt();
+smokeTestBridge();
+finishSplash();
 load();
 
 if (generations.length > 0) {

@@ -2,11 +2,13 @@
 
 Full-screen generative art library for a local ComfyUI workflow.
 
-The app continuously generates from the fixed prompt:
+Enter one prompt, press `play`, and the app continuously generates that prompt with a new random seed each time. The default prompt is:
 
 ```text
-Quantum art
+Quantum Art 35mm Film
 ```
+
+On load, the app shows a short centered infinity mark while it smoke-tests the configured ComfyUI bridge.
 
 ## Local use
 
@@ -44,6 +46,38 @@ https://your-site.example/?api=https://your-comfy-bridge.example
 
 The app stores that API URL in browser local storage.
 
+For private personal access, the cleanest bridge is Tailscale Serve:
+
+```bash
+HOST=127.0.0.1 PORT=8089 BASE_PATH=/infini npm start
+tailscale serve --bg --https 8443 --set-path /infini http://127.0.0.1:8089
+```
+
+Open the hosted site with the HTTPS URL Tailscale gives you:
+
+```text
+https://your-site.example/?api=https://your-mac.your-tailnet.ts.net:8443/infini
+```
+
+The current handle URL is `https://samg.here.now/infini/`.
+
+For public access without requiring viewers to be on your tailnet, use Tailscale Funnel instead of Serve. Keep Funnel pointed at this app's `server.js` proxy, not directly at ComfyUI.
+
+To stop this bridge:
+
+```bash
+tailscale serve --https=8443 off
+launchctl remove com.samg.infini.bridge
+```
+
 ## Reset
 
 `reset` clears only the app's browser-side library cache. It does not delete ComfyUI output files.
+
+## Screensaver
+
+The top-right arrow enters fullscreen screensaver mode. It shows the latest generated image and only fades to a new image when ComfyUI finishes the next one.
+
+## Notes
+
+Future `architecture` mode: add a menu word that accepts a house plan upload, routes it through a separate ComfyUI workflow with Canny/line guidance, then generates infinite variations that follow the plan while randomizing materials and textures.
