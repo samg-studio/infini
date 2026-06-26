@@ -1,0 +1,10 @@
+{
+  "name": "infini",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Full-screen generative art library for a local ComfyUI workflow.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node -e \"const fs=require('fs'); const vm=require('vm'); const html=fs.readFileSync('index.html','utf8'); const m=html.match(/<script>([\\s\\S]*)<\\\\/script>/); if(!m) throw new Error('no script tag found'); new vm.Script(m[1]); console.log('inline script syntax ok');\""
+  }
+}
