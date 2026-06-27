@@ -436,22 +436,30 @@
       }
 
     .spinner {
-      position: absolute;
-      right: clamp(14px, 2vw, 24px);
-      bottom: clamp(14px, 2vw, 24px);
+      position: fixed;
+      right: 28px;
+      bottom: calc(env(safe-area-inset-bottom) + 36px);
       display: grid;
       place-items: center;
       opacity: 0;
       pointer-events: none;
-      z-index: 12;
-      transition: opacity .7s ease;
+      z-index: 710;
+      transition: opacity .8s ease;
       }
     .spinner.show { opacity: 1; }
+
+    .spinner.is-first {
+      left: 50%;
+      right: auto;
+      top: 50%;
+      bottom: auto;
+      transform: translate(-50%, -50%);
+    }
 
     .generation-mark {
       color: #fff;
       display: block;
-      font-size: clamp(38px, 5vw, 72px);
+      font-size: clamp(30px, 3.4vw, 52px);
       font-weight: 800;
       line-height: 1;
       text-shadow:
@@ -459,6 +467,13 @@
         0 5px 24px rgba(0,0,0,.62);
       animation: generationMarkFade 2.8s ease-in-out infinite;
       }
+
+    .spinner.is-first .generation-mark {
+      font-size: clamp(84px, 16vw, 220px);
+      text-shadow:
+        0 0 26px rgba(255,255,255,.2),
+        0 8px 34px rgba(0,0,0,.72);
+    }
 
     @keyframes generationMarkFade {
       0%, 100% {
@@ -697,6 +712,11 @@
         font-size: 12px;
       }
 
+      .spinner {
+        right: 18px;
+        bottom: calc(env(safe-area-inset-bottom) + 36px);
+      }
+
       .studio-link {
         left: 18px;
         max-width: 38vw;
@@ -740,17 +760,24 @@
     }
 
     body.fill-mode .image-wrap {
+      --screen-pad: clamp(10px, 2.2vw, 28px);
       position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
+      left: 50%;
+      top: 50%;
+      right: auto;
+      bottom: auto;
+      width: min(
+        calc(100vw - (var(--screen-pad) * 2)),
+        calc((100dvh - (var(--screen-pad) * 2)) * 16 / 9)
+      );
+      height: auto;
       max-width: none;
       margin-top: 0;
-      aspect-ratio: auto;
-      border-radius: 0;
+      aspect-ratio: 16 / 9;
+      border-radius: 10px;
       background: #000;
-      transform: none;
+      box-shadow: 0 18px 60px rgba(0,0,0,.42);
+      transform: translate(-50%, -50%);
       z-index: 0;
     }
 
@@ -792,9 +819,6 @@
      <img class="main-img" id="mainImgA" src="" alt="" />
      <img class="main-img" id="mainImgB" src="" alt="" />
      <div class="placeholder" id="placeholder"></div>
-     <div class="spinner" id="spinner">
-       <span class="generation-mark" aria-hidden="true">∞</span>
-     </div>
 </div>
 
 <!-- ── carousel ── -->
@@ -805,6 +829,9 @@
 </div>
 
 <div class="active-prompt" id="activePrompt"></div>
+<div class="spinner" id="spinner">
+     <span class="generation-mark" aria-hidden="true">∞</span>
+</div>
 <a class="studio-link" href="https://samg.studio" target="_blank" rel="noopener noreferrer">samg.studio</a>
 
 <script>
@@ -1228,7 +1255,8 @@ function playWaveSound(kind = 'start') {
     start: { duration: 1.35, peak: .34, filter: 1900, delay: .28, feedback: .22 },
     stop: { duration: 1.45, peak: .18, filter: 1180, delay: .34, feedback: .16 },
     transition: { duration: 1.8, peak: .13, filter: 1320, delay: .42, feedback: .12 },
-    reset: { duration: 1.65, peak: .24, filter: 1650, delay: .18, feedback: .1 }
+    reset: { duration: 1.65, peak: .24, filter: 1650, delay: .18, feedback: .1 },
+    snap: { duration: .16, peak: .08, filter: 2600, delay: .08, feedback: .035 }
   };
   const profile = profiles[kind] || profiles.start;
   const now = ctx.currentTime + .025;
@@ -1270,6 +1298,9 @@ function playWaveSound(kind = 'start') {
     addTone(ctx, output, now, duration, 523, 392, .05, -.08);
     addTone(ctx, output, now + .1, duration * .84, 262, 131, .058, .08);
     addNoiseWash(ctx, output, now, duration, .028);
+  } else if (kind === 'snap') {
+    addTone(ctx, output, now, duration, 660, 990, .028, -.08);
+    addTone(ctx, output, now + .025, duration * .78, 990, 740, .018, .08);
   } else {
     addTone(ctx, output, now, duration, 196, 330, .085, -.12);
     addTone(ctx, output, now + .08, duration * .92, 392, 660, .06, .12);
@@ -1313,7 +1344,7 @@ function resetImageLayer(layer) {
   layer.className = 'main-img';
 }
 
-function loadMainImage(src) {
+function loadMainImage(src, options = {}) {
   const nextSrc = normalizeImageSrc(src);
   if (!nextSrc) return;
 
@@ -1327,6 +1358,7 @@ function loadMainImage(src) {
   const nextLayerIndex = 1 - activeImageLayer;
   const nextLayer = $imageLayers[nextLayerIndex];
   const hasCurrentImage = Boolean(currentLayer.getAttribute('src'));
+  const playTransitionSound = Boolean(options.playTransitionSound);
   let didHandleLoad = false;
 
   nextLayer.onload = () => {
@@ -1335,7 +1367,7 @@ function loadMainImage(src) {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (hasCurrentImage) {
-          playWaveSound('transition');
+          if (playTransitionSound) playWaveSound('transition');
           currentLayer.className = 'main-img is-exiting';
           $imageWrap.classList.add('is-transitioning');
         } else {
@@ -1393,7 +1425,9 @@ function updatePlayState() {
   $fillBtn.setAttribute('aria-label', isFillMode ? 'Exit fullscreen' : 'Enter fullscreen');
   $promptInput.readOnly = isRunning;
   $activePrompt.textContent = isRunning ? currentRunPrompt : '';
-  $spinner.classList.toggle('show', isGenerating || hasRemoteWork);
+  const showIndicator = isGenerating || hasRemoteWork;
+  $spinner.classList.toggle('is-first', showIndicator && generations.length === 0);
+  $spinner.classList.toggle('show', showIndicator);
   updateGalleryVisibility();
 }
 
@@ -1551,12 +1585,13 @@ function thumbClassForDistance(distance) {
   return 'edge';
 }
 
-function selectGeneration(index, shouldRender = true, fromRight = false) {
+function selectGeneration(index, shouldRender = true, fromRight = false, options = {}) {
   if (index < 0 || index >= generations.length) return;
 
   currentGenerationIndex = index;
   const gen = generations[index];
-  loadMainImage(gen.imgSrc, fromRight);
+  loadMainImage(gen.imgSrc, { playTransitionSound: fromRight });
+  if (options.playSnap) playWaveSound('snap');
   $placeholder.textContent = '';
   updatePlayState();
 
@@ -1608,12 +1643,12 @@ function renderCarousel() {
 
        /* Click thumbnail: show it as main image */
     div.addEventListener('click', () => {
-       selectGeneration(i);
+       selectGeneration(i, true, false, { playSnap: i !== currentGenerationIndex });
       });
     div.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        selectGeneration(i);
+        selectGeneration(i, true, false, { playSnap: i !== currentGenerationIndex });
       }
     });
 
