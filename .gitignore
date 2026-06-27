@@ -1,4 +1,5 @@
 .DS_Store
 node_modules/
 .herenow/
+.infini/
 npm-debug.log*

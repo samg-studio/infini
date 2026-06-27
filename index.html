@@ -300,6 +300,7 @@
     .play-btn,
     .reset-btn,
     .gallery-btn,
+    .delete-btn,
     .fill-btn {
       appearance: none;
       background: none;
@@ -322,7 +323,9 @@
     .play-btn.is-playing,
     .reset-btn:hover,
     .gallery-btn:hover,
-    .gallery-btn.is-active {
+    .gallery-btn.is-active,
+    .delete-btn:hover,
+    .delete-btn.is-active {
       opacity: 1;
       }
 
@@ -369,6 +372,124 @@
     .fill-btn:hover {
       opacity: 1;
       }
+
+    .delete-panel {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+      padding: calc(env(safe-area-inset-top) + 96px) clamp(18px, 4vw, 58px) calc(env(safe-area-inset-bottom) + 48px);
+      background:
+        radial-gradient(ellipse at top left, rgba(0,0,0,.92), rgba(0,0,0,.68) 42%, rgba(0,0,0,.52)),
+        rgba(0,0,0,.52);
+      backdrop-filter: blur(18px);
+      z-index: 920;
+    }
+
+    body.delete-mode .delete-panel {
+      display: flex;
+    }
+
+    .delete-grid {
+      width: min(1040px, 100%);
+      max-height: min(68vh, 680px);
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+      gap: 10px;
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding: 2px;
+    }
+
+    .delete-thumb {
+      position: relative;
+      appearance: none;
+      width: 100%;
+      aspect-ratio: 1;
+      border: 0;
+      border-radius: 7px;
+      overflow: hidden;
+      background: rgba(255,255,255,.05);
+      cursor: pointer;
+      opacity: .74;
+      padding: 0;
+      transform: translateZ(0);
+      transition: opacity .18s ease, transform .18s ease, filter .18s ease;
+    }
+
+    .delete-thumb:hover,
+    .delete-thumb.is-selected {
+      opacity: 1;
+      filter: saturate(1.05);
+    }
+
+    .delete-thumb.is-selected {
+      transform: scale(.96);
+    }
+
+    .delete-thumb img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .delete-thumb.is-selected::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 2px solid rgba(255,255,255,.86);
+      border-radius: 7px;
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.42);
+      pointer-events: none;
+    }
+
+    .delete-actions {
+      width: min(1040px, 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    .delete-action {
+      appearance: none;
+      background: none;
+      border: 0;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: .2px;
+      line-height: 1;
+      opacity: .56;
+      padding: 0;
+      text-transform: lowercase;
+      transition: opacity .2s ease;
+    }
+
+    .delete-action:hover,
+    .delete-action:not(:disabled) {
+      opacity: 1;
+    }
+
+    .delete-action:disabled {
+      cursor: default;
+      opacity: .24;
+    }
+
+    .delete-empty {
+      grid-column: 1 / -1;
+      color: rgba(255,255,255,.45);
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      padding: 28px 0;
+      text-align: center;
+    }
 
     /* ── image area ── */
     .image-wrap {
@@ -902,6 +1023,20 @@
       transition: opacity .35s ease;
     }
 
+    body.fill-mode .top-bar {
+      position: fixed;
+      inset: 0 0 auto 0;
+      width: 100%;
+      max-width: none;
+      padding: 0;
+      pointer-events: none;
+    }
+
+    body.fill-mode .prompt-dock {
+      opacity: 0;
+      pointer-events: none;
+    }
+
     body.fill-mode .image-wrap {
       --screen-pad: clamp(10px, 2.2vw, 28px);
       position: fixed;
@@ -943,8 +1078,12 @@
     }
 
     body.fill-mode .fill-btn {
+      position: fixed;
+      top: calc(env(safe-area-inset-top) + 18px);
+      right: calc(env(safe-area-inset-right) + 18px);
       opacity: 0;
       pointer-events: none;
+      z-index: 780;
     }
 
     body.fill-mode.is-fill-exit-visible .fill-btn {
@@ -990,6 +1129,7 @@
        <div class="top-controls">
          <button class="play-btn" id="playBtn" type="button">start</button>
          <button class="gallery-btn is-active" id="galleryBtn" type="button">gallery</button>
+         <button class="delete-btn" id="deleteBtn" type="button">delete</button>
          <button class="reset-btn" id="resetBtn" type="button">reset</button>
        </div>
      </div>
@@ -1011,6 +1151,14 @@
 <div class="carousel-track" id="carouselTrack" style="display:none">
      <div class="carousel-inner" id="carouselInner">
        <div class="carousel-viewport" id="carouselViewport"></div>
+     </div>
+</div>
+
+<div class="delete-panel" id="deletePanel" aria-hidden="true">
+     <div class="delete-grid" id="deleteGrid"></div>
+     <div class="delete-actions">
+       <button class="delete-action" id="deleteConfirm" type="button" disabled>delete selected</button>
+       <button class="delete-action" id="deleteCancel" type="button">cancel</button>
      </div>
 </div>
 
@@ -1042,29 +1190,39 @@ const IMAGE_TRANSITION_MS = 3200;
 const SLOW_IMAGE_TRANSITION_MS = 4600;
 const PROMPT_DEMO_HOLD_MS = 3000;
 const PROMPT_EXAMPLES = [
-  'Quantum Art 35mm Film',
-  'Cinematic Kyoto rain garden, moss, lanterns, soft fog, 35mm film',
-  'Brutalist desert villa at blue hour, quiet luxury architecture photo',
-  'Japanese ink forest, silver river, soft wash, handmade paper texture',
-  'Moroccan courtyard garden, zellige tiles, morning sun, 35mm film',
-  'Amazon river at dawn, glass mist, birds, cinematic natural light',
-  'Swiss alpine observatory, snow light, quiet sci-fi design, 70mm film',
-  'Quantum 3D swirls, luminous topology, impossible glass, black field',
-  'Graphic wonder poster, prismatic geometry, Swiss grid, museum print',
-  'Oil paint storm over lavender fields, thick impasto, golden hour',
-  'Seoul neon rain alley, cinematic reflections, late night 35mm still',
-  'Sahara night caravan under stars, moonlit dunes, anamorphic film',
-  'Coral reef cathedral, bioluminescent haze, underwater cinema',
-  'Patagonia glacier lake, wind-cut clouds, nature documentary 35mm',
-  'Milan furniture atelier, chrome, walnut, linen, editorial design study',
-  'Istanbul rooftop at sunrise, gulls, domes, warm Kodak film grain'
+  'Advertising quality symmetrical 35mm film portrait, short-haired woman in a teal suit looking bored in a mustard kitchen, close-up face, soft grain',
+  'Deadpan luxury campaign, woman with blunt black bob in a crimson suit at a mint breakfast table, centered face close-up, precise pastel symmetry, 35mm film grain',
+  'Symmetrical editorial kitchen scene, bored woman in powder blue tailoring holding a tiny espresso, close to face, lemon yellow cabinets, cinematic 35mm grain',
+  'Advertising quality close-up, short-haired woman in a white suit staring past camera in a cherry red kitchen, centered composition, clean color blocking, film grain',
+  'Deadpan fashion campaign, couple in matching green suits standing in a pink tiled kitchen, both bored, close-up two-shot, symmetrical 35mm cinema still',
+  'Symmetrical hotel-suite kitchen, woman with copper short hair in a navy suit and orange silk shirt, bored expression, close face portrait, glossy ad lighting',
+  'Centered 35mm film close-up, short-haired woman in a violet suit leaning on a chrome counter, avocado kitchen walls, perfectly balanced color palette',
+  'Luxury appliance advertisement, bored woman in charcoal tailoring framed by yellow cabinets and red flowers, close-up face, symmetrical deadpan cinema',
+  'Pastel fashion editorial, two people in cream suits in a turquoise kitchen looking politely exhausted, close-up faces, balanced advertising composition',
+  'Symmetrical 35mm film portrait, woman with short silver hair in emerald suit, bored in an immaculate orange kitchen, face close to lens, fine grain',
+  'Deadpan perfume campaign, woman in a black suit and pearl collar inside a pink kitchen, one eyebrow raised, centered close-up, saturated 35mm grain',
+  'Advertising quality scene, short-haired woman in a burgundy suit beside a green refrigerator, bored close-up face, exact symmetry, soft cinematic grain',
+  'Couple in cobalt and butter-yellow suits at a tiny kitchen island, both looking bored, close-up two-person portrait, symmetrical color-blocked 35mm',
+  'Editorial campaign still, woman in ivory tailoring with short hair, bored in a pistachio kitchen full of oranges, centered face close-up, film grain',
+  'Symmetrical deadpan cinema portrait, woman in a rose suit under fluorescent kitchen light, short hair, bored face, powder blue tiles, 35mm texture',
+  'Advertising quality domestic scene, two women in sharp suits in a lemon kitchen, one bored and one amused, close-up faces, centered pastel composition',
+  'Luxury cookware campaign, short-haired woman in a slate suit holding a red saucepan, bored kitchen close-up, exact centered framing, 35mm film grain',
+  'Color-blocked fashion ad, woman in a tangerine suit against seafoam cabinets, deadpan close-up face, symmetrical set design, soft film grain',
+  'Symmetrical close-up portrait, bored woman with short hair in a chocolate suit, pale pink kitchen, tiny birthday cake on counter, cinematic 35mm',
+  'Advertising campaign still, couple in tailored red and navy suits under mint kitchen cabinets, blank expressions, close faces, balanced 35mm grain',
+  'Deadpan kitchen drama, short-haired woman in a lavender suit looking bored beside an untouched pie, centered face close-up, clean pastel ad lighting',
+  'Symmetrical fashion portrait, woman in a forest green suit and white gloves inside a tomato red kitchen, bored expression, 35mm film grain',
+  'High-end magazine ad, two people in monochrome suits separated by a yellow kitchen table, both expressionless, close-up, precise centered composition',
+  'Bored woman with short hair in a royal blue suit, close to face in a spotless cream kitchen, red lipstick, symmetrical advertising still, film grain'
 ];
 let COMFY_HOST = getComfyHost();
 const CLIENT_ID = getClientId();
-let generations = [];          // { title, imgSrc, createdAt }
+let generations = [];          // { title, imgSrc, imageInfo, key, createdAt }
+let deletedImageKeys = new Set();
 let isGenerating = false;
 let isPlaying = false;
 let isGalleryVisible = true;
+let isDeleteMode = false;
 let isFillMode = false;
 let currentGenerationIndex = -1;
 let generationRun = 0;
@@ -1084,6 +1242,7 @@ let generationProgress = { value: 0, max: WORKFLOW_STEPS };
 let progressFallbackTimer = null;
 let progressFallbackStartedAt = 0;
 let lastLiveProgressAt = 0;
+let selectedDeleteKeys = new Set();
 
 /* ── persist to localStorage ── */
 function save() {
@@ -1093,14 +1252,8 @@ function load() {
   try { generations = JSON.parse(localStorage.getItem('infinite_gen') || '[]'); } catch { generations = []; }
   generations = generations
     .filter((gen) => gen.clientId === CLIENT_ID)
-    .map((gen) => ({
-      title: gen.title || DEFAULT_PROMPT,
-      imgSrc: normalizeImageSrc(gen.imgSrc),
-      createdAt: gen.createdAt || Date.now(),
-      width: gen.width || 1200,
-      height: gen.height || 675,
-      clientId: gen.clientId
-    }));
+    .map(normalizeGenerationRecord)
+    .filter((gen) => gen.imgSrc && !deletedImageKeys.has(gen.key));
   save();
 }
 
@@ -1409,6 +1562,57 @@ function normalizeImageSrc(src) {
   return src;
 }
 
+function normalizeImageInfo(info) {
+  if (!info?.filename) return null;
+
+  return {
+    filename: String(info.filename),
+    subfolder: String(info.subfolder || ''),
+    type: String(info.type || 'output') || 'output'
+  };
+}
+
+function imageKeyFromInfo(info) {
+  const imageInfo = normalizeImageInfo(info);
+  if (!imageInfo?.filename) return '';
+  return `${imageInfo.filename}|${imageInfo.subfolder || ''}|${imageInfo.type || 'output'}`;
+}
+
+function imageInfoFromSrc(src) {
+  if (!src) return null;
+
+  try {
+    const url = new URL(src, location.href);
+    const filename = url.searchParams.get('filename');
+    if (!filename) return null;
+
+    return normalizeImageInfo({
+      filename,
+      subfolder: url.searchParams.get('subfolder') || '',
+      type: url.searchParams.get('type') || 'output'
+    });
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGenerationRecord(gen) {
+  const imgSrc = normalizeImageSrc(gen.imgSrc);
+  const imageInfo = normalizeImageInfo(gen.imageInfo) || imageInfoFromSrc(imgSrc);
+  const key = gen.key || imageKeyFromInfo(imageInfo) || imgSrc;
+
+  return {
+    title: gen.title || DEFAULT_PROMPT,
+    imgSrc,
+    imageInfo,
+    key,
+    createdAt: gen.createdAt || Date.now(),
+    width: gen.width || 1200,
+    height: gen.height || 675,
+    clientId: gen.clientId || CLIENT_ID
+  };
+}
+
 function findGeneratedImage(historyItem) {
   if (historyItem?.output?.images?.length) {
     return historyItem.output.images[0];
@@ -1425,13 +1629,14 @@ function findGeneratedImage(historyItem) {
 }
 
 function buildImageUrl(imgInfo) {
-  if (!imgInfo?.filename) return '';
+  const imageInfo = normalizeImageInfo(imgInfo);
+  if (!imageInfo?.filename) return '';
 
   const params = new URLSearchParams({
-    filename: imgInfo.filename,
-    type: imgInfo.type || 'output'
+    filename: imageInfo.filename,
+    type: imageInfo.type || 'output'
   });
-  if (imgInfo.subfolder) params.set('subfolder', imgInfo.subfolder);
+  if (imageInfo.subfolder) params.set('subfolder', imageInfo.subfolder);
   return `${COMFY_HOST}/view?${params}`;
 }
 
@@ -1465,13 +1670,18 @@ function generationFromHistory(historyItem, order) {
   const clientId = getHistoryClientId(historyItem);
   if (clientId !== CLIENT_ID) return null;
 
-  const imgInfo = findGeneratedImage(historyItem);
-  if (!imgInfo?.filename || !imgInfo.filename.startsWith('Infinite_')) return null;
+  const imageInfo = normalizeImageInfo(findGeneratedImage(historyItem));
+  if (!imageInfo?.filename || !imageInfo.filename.startsWith('Infinite_')) return null;
+
+  const key = imageKeyFromInfo(imageInfo);
+  if (deletedImageKeys.has(key)) return null;
 
   const dimensions = getHistoryDimensions(historyItem);
   return {
     title: getHistoryPrompt(historyItem),
-    imgSrc: normalizeImageSrc(buildImageUrl(imgInfo)),
+    imgSrc: normalizeImageSrc(buildImageUrl(imageInfo)),
+    imageInfo,
+    key,
     createdAt: getHistoryTimestamp(historyItem, Date.now() + order),
     width: dimensions.width,
     height: dimensions.height,
@@ -1524,10 +1734,44 @@ async function refreshRemoteWork() {
   }
 }
 
+async function refreshDeletedImages() {
+  if (!COMFY_HOST || isHostedHereNow(location.hostname)) return false;
+
+  try {
+    const res = await apiFetch(`/deleted?clientId=${encodeURIComponent(CLIENT_ID)}`, { cache: 'no-store' }, 8000);
+    if (!res.ok) return false;
+
+    const data = await res.json();
+    const nextDeletedKeys = new Set(Array.isArray(data.keys) ? data.keys : []);
+    let didChange = nextDeletedKeys.size !== deletedImageKeys.size ||
+      [...nextDeletedKeys].some((key) => !deletedImageKeys.has(key));
+
+    deletedImageKeys = nextDeletedKeys;
+    const currentKey = generations[currentGenerationIndex]?.key;
+    const previousLength = generations.length;
+    generations = generations.filter((gen) => !deletedImageKeys.has(gen.key));
+    if (generations.length !== previousLength) {
+      save();
+      didChange = true;
+      if (currentKey && deletedImageKeys.has(currentKey)) {
+        selectNearestGeneration(Math.min(currentGenerationIndex, generations.length - 1));
+      } else if (currentGenerationIndex >= generations.length) {
+        selectNearestGeneration(generations.length - 1);
+      }
+    }
+
+    return didChange;
+  } catch (err) {
+    console.warn('[infini] deleted index sync failed', err);
+    return false;
+  }
+}
+
 async function syncRemoteHistory() {
   if (!COMFY_HOST || isHostedHereNow(location.hostname)) return;
 
   try {
+    const didFilterDeleted = await refreshDeletedImages();
     const res = await apiFetch('/history', { cache: 'no-store' }, 20000);
     if (!res.ok) return;
 
@@ -1538,19 +1782,32 @@ async function syncRemoteHistory() {
       .sort((a, b) => a.createdAt - b.createdAt)
       .slice(-160);
 
-    if (!remoteGenerations.length) return;
+    if (!remoteGenerations.length) {
+      if (didFilterDeleted) {
+        renderCarousel();
+        updatePlayState();
+      }
+      return;
+    }
 
-    const existingSrcs = new Set(generations.map((gen) => normalizeImageSrc(gen.imgSrc)));
+    const existingKeys = new Set(generations.map((gen) => gen.key || normalizeImageSrc(gen.imgSrc)));
     let didImport = false;
 
     for (const generation of remoteGenerations) {
-      if (existingSrcs.has(generation.imgSrc)) continue;
+      const key = generation.key || normalizeImageSrc(generation.imgSrc);
+      if (existingKeys.has(key)) continue;
       generations.push(generation);
-      existingSrcs.add(generation.imgSrc);
+      existingKeys.add(key);
       didImport = true;
     }
 
-    if (!didImport) return;
+    if (!didImport) {
+      if (didFilterDeleted) {
+        renderCarousel();
+        updatePlayState();
+      }
+      return;
+    }
 
     generations.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     save();
@@ -1689,7 +1946,7 @@ async function generate(runId, promptText) {
 
       if (imgInfo) {
         if (runId !== generationRun || !isPlaying) return;
-        onImageReady(buildImageUrl(imgInfo), dimensions);
+        onImageReady(buildImageUrl(imgInfo), dimensions, imgInfo);
         return;
          }
       attempts++;
@@ -1728,6 +1985,7 @@ const $progressFill = document.getElementById('progressFill');
 const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
 const $galleryBtn   = document.getElementById('galleryBtn');
+const $deleteBtn    = document.getElementById('deleteBtn');
 const $fillBtn      = document.getElementById('fillBtn');
 const $promptDock   = document.getElementById('promptDock');
 const $promptInput  = document.getElementById('promptInput');
@@ -1737,6 +1995,10 @@ const $splash       = document.getElementById('splash');
 const $carouselTrack = document.getElementById('carouselTrack');
 const $carouselInner = document.getElementById('carouselInner');
 const $viewport     = document.getElementById('carouselViewport');
+const $deletePanel  = document.getElementById('deletePanel');
+const $deleteGrid   = document.getElementById('deleteGrid');
+const $deleteConfirm = document.getElementById('deleteConfirm');
+const $deleteCancel = document.getElementById('deleteCancel');
 let activeImageLayer = 0;
 let imageTransitionTimer = null;
 let fillExitTimer = null;
@@ -1998,6 +2260,145 @@ function resetImageLayer(layer) {
   layer.className = 'main-img';
 }
 
+function clearCurrentImageView() {
+  clearImageTransitionTimer();
+  $imageLayers.forEach(resetImageLayer);
+  activeImageLayer = 0;
+  currentGenerationIndex = -1;
+  $imageWrap.classList.remove('is-transitioning', 'is-slow-transition');
+  $placeholder.textContent = '';
+  applyArtOrientation(1200, 675);
+}
+
+function selectNearestGeneration(preferredIndex = currentGenerationIndex) {
+  if (generations.length === 0) {
+    clearCurrentImageView();
+    return;
+  }
+
+  const nextIndex = Math.max(0, Math.min(preferredIndex, generations.length - 1));
+  selectGeneration(nextIndex, false);
+}
+
+function setDeleteMode(isActive) {
+  isDeleteMode = isActive;
+  document.body.classList.toggle('delete-mode', isDeleteMode);
+  $deletePanel.setAttribute('aria-hidden', String(!isDeleteMode));
+
+  if (isDeleteMode) {
+    if (isFillMode) exitFillMode();
+    selectedDeleteKeys.clear();
+    renderDeleteGrid();
+  } else {
+    selectedDeleteKeys.clear();
+    renderDeleteGrid();
+  }
+
+  updatePlayState();
+}
+
+function renderDeleteGrid() {
+  $deleteGrid.innerHTML = '';
+
+  const deletableGenerations = generations.filter((gen) => gen.imageInfo?.filename && gen.key);
+  if (!deletableGenerations.length) {
+    const empty = document.createElement('div');
+    empty.className = 'delete-empty';
+    empty.textContent = 'nothing to delete';
+    $deleteGrid.appendChild(empty);
+    $deleteConfirm.disabled = true;
+    $deleteConfirm.textContent = 'delete selected';
+    return;
+  }
+
+  for (const gen of deletableGenerations) {
+    const thumb = document.createElement('button');
+    thumb.className = `delete-thumb${selectedDeleteKeys.has(gen.key) ? ' is-selected' : ''}`;
+    thumb.type = 'button';
+    thumb.setAttribute('aria-label', gen.title || 'Delete image');
+    thumb.setAttribute('aria-pressed', String(selectedDeleteKeys.has(gen.key)));
+
+    const img = document.createElement('img');
+    img.src = normalizeImageSrc(gen.imgSrc);
+    img.alt = gen.title || '';
+    img.draggable = false;
+    thumb.appendChild(img);
+
+    thumb.addEventListener('click', () => {
+      if (selectedDeleteKeys.has(gen.key)) {
+        selectedDeleteKeys.delete(gen.key);
+      } else {
+        selectedDeleteKeys.add(gen.key);
+      }
+      renderDeleteGrid();
+    });
+
+    $deleteGrid.appendChild(thumb);
+  }
+
+  $deleteConfirm.disabled = selectedDeleteKeys.size === 0;
+  $deleteConfirm.textContent = selectedDeleteKeys.size > 0
+    ? `delete ${selectedDeleteKeys.size}`
+    : 'delete selected';
+}
+
+async function deleteSelectedImages() {
+  if (selectedDeleteKeys.size === 0) return;
+
+  const targets = generations.filter((gen) =>
+    selectedDeleteKeys.has(gen.key) && gen.imageInfo?.filename
+  );
+  if (!targets.length) return;
+
+  $deleteConfirm.disabled = true;
+  $deleteConfirm.textContent = 'deleting';
+
+  try {
+    const res = await apiFetch('/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: CLIENT_ID,
+        images: targets.map((gen) => gen.imageInfo)
+      })
+    }, 30000);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'delete failed');
+
+    const deletedKeys = new Set((data.deleted || []).map((item) => item.key).filter(Boolean));
+    if (data.rejected?.length) console.warn('[infini] delete rejected', data.rejected);
+    if (deletedKeys.size === 0) {
+      renderDeleteGrid();
+      return;
+    }
+
+    deletedKeys.forEach((key) => deletedImageKeys.add(key));
+    const currentKey = generations[currentGenerationIndex]?.key;
+    const preferredIndex = currentGenerationIndex;
+    generations = generations.filter((gen) => !deletedKeys.has(gen.key));
+    selectedDeleteKeys.clear();
+    save();
+
+    if (deletedKeys.has(currentKey)) {
+      selectNearestGeneration(Math.min(preferredIndex, generations.length - 1));
+    } else {
+      const retainedIndex = generations.findIndex((gen) => gen.key === currentKey);
+      if (retainedIndex >= 0) {
+        currentGenerationIndex = retainedIndex;
+      } else if (currentGenerationIndex >= generations.length) {
+        selectNearestGeneration(generations.length - 1);
+      }
+    }
+
+    renderCarousel();
+    renderDeleteGrid();
+    updatePlayState();
+  } catch (err) {
+    console.warn('[infini] delete failed', err);
+    renderDeleteGrid();
+  }
+}
+
 function loadMainImage(src, options = {}) {
   const nextSrc = normalizeImageSrc(src);
   if (!nextSrc) return;
@@ -2051,11 +2452,14 @@ function loadMainImage(src, options = {}) {
 }
 
 /* When image arrives from ComfyUI */
-function onImageReady(url, dimensions = currentRunDimensions) {
+function onImageReady(url, dimensions = currentRunDimensions, imgInfo = null) {
   const imgSrc = normalizeImageSrc(url);
+  const imageInfo = normalizeImageInfo(imgInfo) || imageInfoFromSrc(imgSrc);
   generations.push({
     title: currentRunPrompt,
     imgSrc,
+    imageInfo,
+    key: imageKeyFromInfo(imageInfo) || imgSrc,
     createdAt: Date.now(),
     width: dimensions.width,
     height: dimensions.height,
@@ -2086,6 +2490,8 @@ function updatePlayState() {
   $playBtn.setAttribute('aria-label', isRunning ? 'Stop generation' : 'Start generation');
   $galleryBtn.classList.toggle('is-active', isGalleryVisible);
   $galleryBtn.setAttribute('aria-pressed', String(isGalleryVisible));
+  $deleteBtn.classList.toggle('is-active', isDeleteMode);
+  $deleteBtn.setAttribute('aria-pressed', String(isDeleteMode));
   $fillBtn.classList.toggle('is-active', isFillMode);
   $fillBtn.setAttribute('aria-pressed', String(isFillMode));
   $fillBtn.setAttribute('aria-label', isFillMode ? 'Exit fullscreen' : 'Enter fullscreen');
@@ -2103,7 +2509,7 @@ function updatePlayState() {
 }
 
 function updateGalleryVisibility() {
-  const shouldShow = generations.length > 0 && isGalleryVisible && !isFillMode;
+  const shouldShow = generations.length > 0 && isGalleryVisible && !isFillMode && !isDeleteMode;
   $carouselTrack.classList.toggle('hidden', !shouldShow);
 }
 
@@ -2175,6 +2581,7 @@ async function stopGeneration() {
 function startGeneration(source = 'menu') {
   if (isPlaying || isGenerating) return;
   if (!ensureComfyHost()) return;
+  if (isDeleteMode) setDeleteMode(false);
 
   if (shouldUseTailnetOrigin()) {
     launchTailnetApp(source);
@@ -2199,6 +2606,10 @@ function resetLibrary() {
   isGenerating = false;
   hasRemoteWork = false;
   isGalleryVisible = true;
+  isDeleteMode = false;
+  document.body.classList.remove('delete-mode');
+  $deletePanel.setAttribute('aria-hidden', 'true');
+  selectedDeleteKeys.clear();
   activePromptId = null;
   stopProgressFallback();
   resetGenerationProgress();
@@ -2211,12 +2622,9 @@ function resetLibrary() {
 
   try { localStorage.removeItem('infinite_gen'); } catch {}
 
-  clearImageTransitionTimer();
-  $imageLayers.forEach(resetImageLayer);
-  activeImageLayer = 0;
-  $imageWrap.classList.remove('is-transitioning');
-  $placeholder.textContent = '';
+  clearCurrentImageView();
   renderCarousel();
+  renderDeleteGrid();
   updatePlayState();
   stopComfyWork();
 }
@@ -2326,6 +2734,7 @@ function finishFillSwipe(e) {
 }
 
 async function enterFillMode() {
+  if (isDeleteMode) setDeleteMode(false);
   isFillMode = true;
   document.body.classList.add('fill-mode');
   if (document.activeElement === $promptInput) $promptInput.blur();
@@ -2356,6 +2765,13 @@ async function exitFillMode() {
 $galleryBtn.addEventListener('click', () => {
   setGalleryVisible(!isGalleryVisible);
 });
+
+$deleteBtn.addEventListener('click', () => {
+  setDeleteMode(!isDeleteMode);
+});
+
+$deleteConfirm.addEventListener('click', deleteSelectedImages);
+$deleteCancel.addEventListener('click', () => setDeleteMode(false));
 
 $fillBtn.addEventListener('click', () => {
   if (isFillMode) {
