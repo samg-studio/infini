@@ -178,7 +178,7 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 9px;
+      gap: 12px;
       grid-column: 1;
       grid-row: 1;
       }
@@ -306,16 +306,18 @@
     .mode-panel {
       display: none;
       position: fixed;
-      top: 126px;
+      top: 118px;
       right: 48px;
-      width: min(340px, 28vw);
-      flex-wrap: wrap;
-      gap: 7px 12px;
+      width: min(230px, 24vw);
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: flex-end;
+      gap: 0;
       justify-content: flex-start;
       margin-top: 0;
       max-width: none;
       opacity: .82;
-      text-align: left;
+      text-align: right;
     }
 
     body.mode-architecture .mode-panel,
@@ -325,10 +327,12 @@
 
     .mode-options {
       display: flex;
-      flex-wrap: wrap;
-      gap: 7px 12px;
+      flex-direction: column;
+      align-items: flex-end;
+      flex-wrap: nowrap;
+      gap: 10px;
       justify-content: flex-start;
-      text-align: left;
+      text-align: right;
     }
 
     body.mode-architecture .type-options,
@@ -344,11 +348,11 @@
       color: rgba(255,255,255,.58);
       cursor: pointer;
       font: inherit;
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 500;
       line-height: 1.15;
       padding: 0;
-      text-align: left;
+      text-align: right;
       text-transform: lowercase;
       transition: color .2s ease, opacity .2s ease;
     }
@@ -473,9 +477,9 @@
       color: #fff;
       cursor: pointer;
       font: inherit;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 500;
-      letter-spacing: .2px;
+      letter-spacing: .35px;
       line-height: 1;
       opacity: .52;
       padding: 0;
@@ -920,7 +924,7 @@
     .generation-mark {
       color: #fff;
       display: block;
-      font-size: clamp(30px, 3.4vw, 52px);
+      font-size: clamp(42px, 4.8vw, 72px);
       font-weight: 800;
       line-height: 1;
       text-shadow:
@@ -930,7 +934,7 @@
       }
 
     .spinner.is-first .generation-mark {
-      font-size: clamp(84px, 16vw, 220px);
+      font-size: clamp(108px, 19vw, 280px);
       text-shadow:
         0 0 26px rgba(255,255,255,.2),
         0 8px 34px rgba(0,0,0,.72);
@@ -1129,14 +1133,14 @@
         top: 70px;
         right: 20px;
       }
-      .top-controls { gap: 9px; }
+      .top-controls { gap: 11px; }
       .prompt-dock {
         width: min(100%, 560px);
       }
       .mode-panel {
-        top: 108px;
+        top: 100px;
         right: 20px;
-        width: min(300px, 34vw);
+        width: min(210px, 30vw);
       }
       .prompt-input {
         font-size: 17px;
@@ -1208,15 +1212,15 @@
       }
 
       .mode-panel {
-        top: calc(env(safe-area-inset-top) + 112px);
+        top: calc(env(safe-area-inset-top) + 90px);
         right: 18px;
-        width: min(220px, 46vw);
-        gap: 7px 10px;
+        width: min(160px, 38vw);
+        gap: 0;
       }
 
       .mode-option,
       .mode-upload {
-        font-size: 12px;
+        font-size: 14px;
       }
 
       .prompt-preview,
