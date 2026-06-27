@@ -300,6 +300,7 @@
     .play-btn,
     .reset-btn,
     .gallery-btn,
+    .download-btn,
     .delete-btn,
     .fill-btn {
       appearance: none;
@@ -324,6 +325,8 @@
     .reset-btn:hover,
     .gallery-btn:hover,
     .gallery-btn.is-active,
+    .download-btn:hover,
+    .download-btn.is-active,
     .delete-btn:hover,
     .delete-btn.is-active {
       opacity: 1;
@@ -1129,6 +1132,7 @@
        <div class="top-controls">
          <button class="play-btn" id="playBtn" type="button">start</button>
          <button class="gallery-btn is-active" id="galleryBtn" type="button">gallery</button>
+         <button class="download-btn" id="downloadBtn" type="button">download</button>
          <button class="delete-btn" id="deleteBtn" type="button">delete</button>
          <button class="reset-btn" id="resetBtn" type="button">reset</button>
        </div>
@@ -1223,6 +1227,7 @@ let isGenerating = false;
 let isPlaying = false;
 let isGalleryVisible = true;
 let isDeleteMode = false;
+let isDownloadMode = false;
 let isFillMode = false;
 let currentGenerationIndex = -1;
 let generationRun = 0;
@@ -1242,7 +1247,8 @@ let generationProgress = { value: 0, max: WORKFLOW_STEPS };
 let progressFallbackTimer = null;
 let progressFallbackStartedAt = 0;
 let lastLiveProgressAt = 0;
-let selectedDeleteKeys = new Set();
+let selectedGridKeys = new Set();
+let isPruningMissing = false;
 
 /* ── persist to localStorage ── */
 function save() {
@@ -1268,24 +1274,16 @@ function getQueryPrompt() {
 function loadPrompt() {
   try {
     const queryPrompt = getQueryPrompt();
+    localStorage.removeItem(PROMPT_STORAGE_KEY);
     if (queryPrompt) return queryPrompt;
-
-    const storedPrompt = (localStorage.getItem(PROMPT_STORAGE_KEY) || '').trim();
-    if (!storedPrompt || storedPrompt === PREVIOUS_DEFAULT_PROMPT || storedPrompt === DEFAULT_PROMPT) return '';
-    return storedPrompt;
   } catch {
-    return '';
   }
+  return '';
 }
 
 function savePrompt(value) {
   try {
-    const prompt = (value || '').trim();
-    if (prompt) {
-      localStorage.setItem(PROMPT_STORAGE_KEY, prompt);
-    } else {
-      localStorage.removeItem(PROMPT_STORAGE_KEY);
-    }
+    localStorage.removeItem(PROMPT_STORAGE_KEY);
   } catch {}
 }
 
@@ -1628,7 +1626,7 @@ function findGeneratedImage(historyItem) {
   return null;
 }
 
-function buildImageUrl(imgInfo) {
+function buildImagePath(imgInfo) {
   const imageInfo = normalizeImageInfo(imgInfo);
   if (!imageInfo?.filename) return '';
 
@@ -1637,7 +1635,65 @@ function buildImageUrl(imgInfo) {
     type: imageInfo.type || 'output'
   });
   if (imageInfo.subfolder) params.set('subfolder', imageInfo.subfolder);
-  return `${COMFY_HOST}/view?${params}`;
+  return `/view?${params}`;
+}
+
+function buildImageUrl(imgInfo) {
+  const imagePath = buildImagePath(imgInfo);
+  return imagePath ? `${COMFY_HOST}${imagePath}` : '';
+}
+
+async function generationSourceExists(gen) {
+  if (!COMFY_HOST || !gen?.imageInfo?.filename) return true;
+
+  try {
+    const res = await apiFetch(buildImagePath(gen.imageInfo), {
+      method: 'HEAD',
+      cache: 'no-store'
+    }, 8000);
+
+    return res.status !== 404 && res.status !== 410;
+  } catch {
+    return true;
+  }
+}
+
+async function filterAvailableGenerations(candidates) {
+  const available = [];
+  const chunkSize = 8;
+
+  for (let i = 0; i < candidates.length; i += chunkSize) {
+    const chunk = candidates.slice(i, i + chunkSize);
+    const results = await Promise.all(chunk.map(async (gen) => ({
+      gen,
+      exists: await generationSourceExists(gen)
+    })));
+
+    results.forEach(({ gen, exists }) => {
+      if (exists) available.push(gen);
+    });
+  }
+
+  return available;
+}
+
+async function pruneMissingGenerations() {
+  if (!COMFY_HOST || isPruningMissing || generations.length === 0) return false;
+
+  isPruningMissing = true;
+  try {
+    const availableGenerations = await filterAvailableGenerations(generations);
+
+    if (availableGenerations.length === generations.length) return false;
+
+    const availableKeys = new Set(availableGenerations.map((gen) => gen.key));
+    const missingKeys = new Set(generations
+      .map((gen) => gen.key)
+      .filter((key) => !availableKeys.has(key)));
+    return removeGenerationsByKeys(missingKeys);
+  } finally {
+    isPruningMissing = false;
+  }
 }
 
 function getHistoryPrompt(historyItem) {
@@ -1771,6 +1827,7 @@ async function syncRemoteHistory() {
   if (!COMFY_HOST || isHostedHereNow(location.hostname)) return;
 
   try {
+    const didPruneMissing = await pruneMissingGenerations();
     const didFilterDeleted = await refreshDeletedImages();
     const res = await apiFetch('/history', { cache: 'no-store' }, 20000);
     if (!res.ok) return;
@@ -1781,9 +1838,10 @@ async function syncRemoteHistory() {
       .filter(Boolean)
       .sort((a, b) => a.createdAt - b.createdAt)
       .slice(-160);
+    const availableRemoteGenerations = await filterAvailableGenerations(remoteGenerations);
 
-    if (!remoteGenerations.length) {
-      if (didFilterDeleted) {
+    if (!availableRemoteGenerations.length) {
+      if (didFilterDeleted || didPruneMissing) {
         renderCarousel();
         updatePlayState();
       }
@@ -1793,7 +1851,7 @@ async function syncRemoteHistory() {
     const existingKeys = new Set(generations.map((gen) => gen.key || normalizeImageSrc(gen.imgSrc)));
     let didImport = false;
 
-    for (const generation of remoteGenerations) {
+    for (const generation of availableRemoteGenerations) {
       const key = generation.key || normalizeImageSrc(generation.imgSrc);
       if (existingKeys.has(key)) continue;
       generations.push(generation);
@@ -1802,7 +1860,7 @@ async function syncRemoteHistory() {
     }
 
     if (!didImport) {
-      if (didFilterDeleted) {
+      if (didFilterDeleted || didPruneMissing) {
         renderCarousel();
         updatePlayState();
       }
@@ -1985,6 +2043,7 @@ const $progressFill = document.getElementById('progressFill');
 const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
 const $galleryBtn   = document.getElementById('galleryBtn');
+const $downloadBtn  = document.getElementById('downloadBtn');
 const $deleteBtn    = document.getElementById('deleteBtn');
 const $fillBtn      = document.getElementById('fillBtn');
 const $promptDock   = document.getElementById('promptDock');
@@ -2256,6 +2315,7 @@ function clearImageTransitionTimer() {
 
 function resetImageLayer(layer) {
   layer.onload = null;
+  layer.onerror = null;
   layer.removeAttribute('src');
   layer.className = 'main-img';
 }
@@ -2280,43 +2340,87 @@ function selectNearestGeneration(preferredIndex = currentGenerationIndex) {
   selectGeneration(nextIndex, false);
 }
 
-function setDeleteMode(isActive) {
-  isDeleteMode = isActive;
-  document.body.classList.toggle('delete-mode', isDeleteMode);
-  $deletePanel.setAttribute('aria-hidden', String(!isDeleteMode));
+function removeGenerationsByKeys(keys) {
+  if (!keys?.size) return false;
 
-  if (isDeleteMode) {
-    if (isFillMode) exitFillMode();
-    selectedDeleteKeys.clear();
-    renderDeleteGrid();
+  const currentKey = generations[currentGenerationIndex]?.key;
+  const preferredIndex = currentGenerationIndex >= 0
+    ? currentGenerationIndex
+    : generations.length - 1;
+  const previousLength = generations.length;
+
+  generations = generations.filter((gen) => !keys.has(gen.key));
+  if (generations.length === previousLength) return false;
+
+  selectedGridKeys.forEach((key) => {
+    if (keys.has(key)) selectedGridKeys.delete(key);
+  });
+  save();
+
+  if (currentKey && !keys.has(currentKey)) {
+    const retainedIndex = generations.findIndex((gen) => gen.key === currentKey);
+    if (retainedIndex >= 0) currentGenerationIndex = retainedIndex;
   } else {
-    selectedDeleteKeys.clear();
-    renderDeleteGrid();
+    selectNearestGeneration(Math.min(preferredIndex, generations.length - 1));
   }
 
+  renderCarousel();
+  renderGridPanel();
+  updatePlayState();
+  return true;
+}
+
+function isGridPanelOpen() {
+  return isDeleteMode || isDownloadMode;
+}
+
+function setGridMode(mode) {
+  isDeleteMode = mode === 'delete';
+  isDownloadMode = mode === 'download';
+  document.body.classList.toggle('delete-mode', isGridPanelOpen());
+  $deletePanel.setAttribute('aria-hidden', String(!isGridPanelOpen()));
+  selectedGridKeys.clear();
+
+  if (isGridPanelOpen() && isFillMode) exitFillMode();
+  if (isDownloadMode && currentGenerationIndex >= 0) {
+    const currentKey = generations[currentGenerationIndex]?.key;
+    if (currentKey) selectedGridKeys.add(currentKey);
+  }
+
+  renderGridPanel();
   updatePlayState();
 }
 
-function renderDeleteGrid() {
+function setDeleteMode(isActive) {
+  setGridMode(isActive ? 'delete' : '');
+}
+
+function setDownloadMode(isActive) {
+  setGridMode(isActive ? 'download' : '');
+}
+
+function renderGridPanel() {
   $deleteGrid.innerHTML = '';
 
-  const deletableGenerations = generations.filter((gen) => gen.imageInfo?.filename && gen.key);
-  if (!deletableGenerations.length) {
+  const panelGenerations = generations.filter((gen) => gen.imageInfo?.filename && gen.key);
+  const actionWord = isDownloadMode ? 'download' : 'delete';
+
+  if (!panelGenerations.length) {
     const empty = document.createElement('div');
     empty.className = 'delete-empty';
-    empty.textContent = 'nothing to delete';
+    empty.textContent = `nothing to ${actionWord}`;
     $deleteGrid.appendChild(empty);
     $deleteConfirm.disabled = true;
-    $deleteConfirm.textContent = 'delete selected';
+    $deleteConfirm.textContent = `${actionWord} selected`;
     return;
   }
 
-  for (const gen of deletableGenerations) {
+  for (const gen of panelGenerations) {
     const thumb = document.createElement('button');
-    thumb.className = `delete-thumb${selectedDeleteKeys.has(gen.key) ? ' is-selected' : ''}`;
+    thumb.className = `delete-thumb${selectedGridKeys.has(gen.key) ? ' is-selected' : ''}`;
     thumb.type = 'button';
-    thumb.setAttribute('aria-label', gen.title || 'Delete image');
-    thumb.setAttribute('aria-pressed', String(selectedDeleteKeys.has(gen.key)));
+    thumb.setAttribute('aria-label', gen.title || `${actionWord} image`);
+    thumb.setAttribute('aria-pressed', String(selectedGridKeys.has(gen.key)));
 
     const img = document.createElement('img');
     img.src = normalizeImageSrc(gen.imgSrc);
@@ -2325,28 +2429,100 @@ function renderDeleteGrid() {
     thumb.appendChild(img);
 
     thumb.addEventListener('click', () => {
-      if (selectedDeleteKeys.has(gen.key)) {
-        selectedDeleteKeys.delete(gen.key);
+      if (selectedGridKeys.has(gen.key)) {
+        selectedGridKeys.delete(gen.key);
       } else {
-        selectedDeleteKeys.add(gen.key);
+        selectedGridKeys.add(gen.key);
       }
-      renderDeleteGrid();
+      renderGridPanel();
     });
 
     $deleteGrid.appendChild(thumb);
   }
 
-  $deleteConfirm.disabled = selectedDeleteKeys.size === 0;
-  $deleteConfirm.textContent = selectedDeleteKeys.size > 0
-    ? `delete ${selectedDeleteKeys.size}`
-    : 'delete selected';
+  $deleteConfirm.disabled = selectedGridKeys.size === 0;
+  $deleteConfirm.textContent = selectedGridKeys.size > 0
+    ? `${actionWord} ${selectedGridKeys.size}`
+    : `${actionWord} selected`;
+}
+
+function sanitizeDownloadName(value, fallback) {
+  const filename = String(value || fallback || 'infini.png')
+    .replace(/[\\/:"*?<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return filename || fallback || 'infini.png';
+}
+
+function downloadBlob(blob, filename) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 2500);
+}
+
+async function downloadGeneration(gen, index) {
+  const res = await fetchWithTimeout(normalizeImageSrc(gen.imgSrc), {
+    cache: 'no-store'
+  }, 30000);
+
+  if (res.status === 404 || res.status === 410) {
+    const err = new Error('missing source');
+    err.missingKey = gen.key;
+    throw err;
+  }
+
+  if (!res.ok) throw new Error(`download failed ${res.status}`);
+
+  const blob = await res.blob();
+  const fallback = `infini-${String(index + 1).padStart(3, '0')}.png`;
+  downloadBlob(blob, sanitizeDownloadName(gen.imageInfo?.filename, fallback));
+}
+
+async function downloadSelectedImages() {
+  if (selectedGridKeys.size === 0) return;
+
+  const targets = generations.filter((gen) =>
+    selectedGridKeys.has(gen.key) && gen.imageInfo?.filename
+  );
+  if (!targets.length) return;
+
+  $deleteConfirm.disabled = true;
+  $deleteConfirm.textContent = 'downloading';
+
+  const missingKeys = new Set();
+
+  for (let i = 0; i < targets.length; i++) {
+    try {
+      await downloadGeneration(targets[i], i);
+      if (i < targets.length - 1) await new Promise((resolve) => setTimeout(resolve, 180));
+    } catch (err) {
+      if (err.missingKey) {
+        missingKeys.add(err.missingKey);
+      } else {
+        console.warn('[infini] download failed', err);
+      }
+    }
+  }
+
+  if (missingKeys.size > 0) {
+    removeGenerationsByKeys(missingKeys);
+  }
+
+  selectedGridKeys.clear();
+  renderGridPanel();
 }
 
 async function deleteSelectedImages() {
-  if (selectedDeleteKeys.size === 0) return;
+  if (selectedGridKeys.size === 0) return;
 
   const targets = generations.filter((gen) =>
-    selectedDeleteKeys.has(gen.key) && gen.imageInfo?.filename
+    selectedGridKeys.has(gen.key) && gen.imageInfo?.filename
   );
   if (!targets.length) return;
 
@@ -2368,34 +2544,17 @@ async function deleteSelectedImages() {
     const deletedKeys = new Set((data.deleted || []).map((item) => item.key).filter(Boolean));
     if (data.rejected?.length) console.warn('[infini] delete rejected', data.rejected);
     if (deletedKeys.size === 0) {
-      renderDeleteGrid();
+      renderGridPanel();
       return;
     }
 
     deletedKeys.forEach((key) => deletedImageKeys.add(key));
-    const currentKey = generations[currentGenerationIndex]?.key;
-    const preferredIndex = currentGenerationIndex;
-    generations = generations.filter((gen) => !deletedKeys.has(gen.key));
-    selectedDeleteKeys.clear();
-    save();
-
-    if (deletedKeys.has(currentKey)) {
-      selectNearestGeneration(Math.min(preferredIndex, generations.length - 1));
-    } else {
-      const retainedIndex = generations.findIndex((gen) => gen.key === currentKey);
-      if (retainedIndex >= 0) {
-        currentGenerationIndex = retainedIndex;
-      } else if (currentGenerationIndex >= generations.length) {
-        selectNearestGeneration(generations.length - 1);
-      }
-    }
-
-    renderCarousel();
-    renderDeleteGrid();
-    updatePlayState();
+    selectedGridKeys.clear();
+    removeGenerationsByKeys(deletedKeys);
+    renderGridPanel();
   } catch (err) {
     console.warn('[infini] delete failed', err);
-    renderDeleteGrid();
+    renderGridPanel();
   }
 }
 
@@ -2445,6 +2604,14 @@ function loadMainImage(src, options = {}) {
       });
     });
   };
+  nextLayer.onerror = async () => {
+    if (didHandleLoad) return;
+    const failedGeneration = generations.find((gen) => normalizeImageSrc(gen.imgSrc) === nextSrc);
+    if (!failedGeneration) return;
+    if (await generationSourceExists(failedGeneration)) return;
+    didHandleLoad = true;
+    removeGenerationsByKeys(new Set([failedGeneration.key]));
+  };
   nextLayer.alt = currentRunPrompt;
   nextLayer.src = nextSrc;
 
@@ -2490,6 +2657,8 @@ function updatePlayState() {
   $playBtn.setAttribute('aria-label', isRunning ? 'Stop generation' : 'Start generation');
   $galleryBtn.classList.toggle('is-active', isGalleryVisible);
   $galleryBtn.setAttribute('aria-pressed', String(isGalleryVisible));
+  $downloadBtn.classList.toggle('is-active', isDownloadMode);
+  $downloadBtn.setAttribute('aria-pressed', String(isDownloadMode));
   $deleteBtn.classList.toggle('is-active', isDeleteMode);
   $deleteBtn.setAttribute('aria-pressed', String(isDeleteMode));
   $fillBtn.classList.toggle('is-active', isFillMode);
@@ -2509,7 +2678,7 @@ function updatePlayState() {
 }
 
 function updateGalleryVisibility() {
-  const shouldShow = generations.length > 0 && isGalleryVisible && !isFillMode && !isDeleteMode;
+  const shouldShow = generations.length > 0 && isGalleryVisible && !isFillMode && !isGridPanelOpen();
   $carouselTrack.classList.toggle('hidden', !shouldShow);
 }
 
@@ -2581,7 +2750,7 @@ async function stopGeneration() {
 function startGeneration(source = 'menu') {
   if (isPlaying || isGenerating) return;
   if (!ensureComfyHost()) return;
-  if (isDeleteMode) setDeleteMode(false);
+  if (isGridPanelOpen()) setGridMode('');
 
   if (shouldUseTailnetOrigin()) {
     launchTailnetApp(source);
@@ -2607,9 +2776,10 @@ function resetLibrary() {
   hasRemoteWork = false;
   isGalleryVisible = true;
   isDeleteMode = false;
+  isDownloadMode = false;
   document.body.classList.remove('delete-mode');
   $deletePanel.setAttribute('aria-hidden', 'true');
-  selectedDeleteKeys.clear();
+  selectedGridKeys.clear();
   activePromptId = null;
   stopProgressFallback();
   resetGenerationProgress();
@@ -2624,7 +2794,7 @@ function resetLibrary() {
 
   clearCurrentImageView();
   renderCarousel();
-  renderDeleteGrid();
+  renderGridPanel();
   updatePlayState();
   stopComfyWork();
 }
@@ -2734,7 +2904,7 @@ function finishFillSwipe(e) {
 }
 
 async function enterFillMode() {
-  if (isDeleteMode) setDeleteMode(false);
+  if (isGridPanelOpen()) setGridMode('');
   isFillMode = true;
   document.body.classList.add('fill-mode');
   if (document.activeElement === $promptInput) $promptInput.blur();
@@ -2766,12 +2936,22 @@ $galleryBtn.addEventListener('click', () => {
   setGalleryVisible(!isGalleryVisible);
 });
 
+$downloadBtn.addEventListener('click', () => {
+  setDownloadMode(!isDownloadMode);
+});
+
 $deleteBtn.addEventListener('click', () => {
   setDeleteMode(!isDeleteMode);
 });
 
-$deleteConfirm.addEventListener('click', deleteSelectedImages);
-$deleteCancel.addEventListener('click', () => setDeleteMode(false));
+$deleteConfirm.addEventListener('click', () => {
+  if (isDownloadMode) {
+    downloadSelectedImages();
+  } else if (isDeleteMode) {
+    deleteSelectedImages();
+  }
+});
+$deleteCancel.addEventListener('click', () => setGridMode(''));
 
 $fillBtn.addEventListener('click', () => {
   if (isFillMode) {
@@ -2922,7 +3102,7 @@ function renderCarousel() {
 /* ═══════════════════════════════════════
    Init
    ═══════════════════════════════════════ */
-function init() {
+async function init() {
   $promptInput.value = loadPrompt();
   currentRunPrompt = $promptInput.value || currentDemoPrompt;
 
@@ -2936,6 +3116,7 @@ function init() {
   refreshRemoteWork();
   finishSplash();
   load();
+  await pruneMissingGenerations();
 
   if (generations.length > 0) {
     selectGeneration(generations.length - 1, false);
@@ -2952,7 +3133,7 @@ function init() {
   }
 }
 
-init();
+init().catch((err) => console.warn('[infini] init failed', err));
 
 </script>
 </body>
