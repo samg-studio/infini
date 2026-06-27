@@ -28,10 +28,12 @@
     .splash {
       position: fixed;
       inset: 0;
+      appearance: none;
+      border: 0;
       display: grid;
       place-items: center;
       background: #000;
-      pointer-events: none;
+      cursor: pointer;
       z-index: 2000;
       animation: splashFade 3.2s ease forwards;
     }
@@ -47,6 +49,11 @@
       line-height: 1;
       opacity: 0;
       animation: splashMark 2.9s ease forwards;
+    }
+
+    .splash:focus-visible {
+      outline: 1px solid rgba(255,255,255,.62);
+      outline-offset: -28px;
     }
 
     @keyframes splashFade {
@@ -194,9 +201,42 @@
       }
 
     .fill-btn {
-      font-size: 24px;
-      line-height: .8;
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
       opacity: .82;
+    }
+
+    .fill-icon {
+      position: relative;
+      display: block;
+      width: 18px;
+      height: 18px;
+    }
+
+    .fill-icon::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 9px;
+      height: 9px;
+      border-top: 2px solid currentColor;
+      border-right: 2px solid currentColor;
+    }
+
+    .fill-icon::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      bottom: 4px;
+      width: 16px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 999px;
+      transform: rotate(-45deg);
+      transform-origin: right center;
     }
 
     .fill-btn.is-active,
@@ -644,16 +684,16 @@
 </head>
 <body>
 
-<div class="splash" id="splash" aria-hidden="true">
-     <div class="splash-mark">∞</div>
-</div>
+<button class="splash" id="splash" type="button" aria-label="Start infini">
+     <span class="splash-mark">∞</span>
+</button>
 
 <!-- top bar -->
 <div class="top-bar">
      <div class="title-stack">
        <div class="brand">infini</div>
        <div class="top-controls">
-         <button class="play-btn" id="playBtn" type="button">play</button>
+         <button class="play-btn" id="playBtn" type="button">start</button>
          <button class="reset-btn" id="resetBtn" type="button">reset</button>
          <button class="gallery-btn is-active" id="galleryBtn" type="button">gallery</button>
        </div>
@@ -661,7 +701,7 @@
      <div class="prompt-dock">
        <input class="prompt-input" id="promptInput" type="text" autocomplete="off" spellcheck="false" aria-label="Prompt" />
      </div>
-     <button class="fill-btn" id="fillBtn" type="button" aria-label="Enter fullscreen">↗</button>
+     <button class="fill-btn" id="fillBtn" type="button" aria-label="Enter fullscreen"><span class="fill-icon" aria-hidden="true"></span></button>
 </div>
 
 <!-- ── image area ── -->
@@ -1011,6 +1051,11 @@ function finishSplash() {
   }, 3400);
 }
 
+function hideSplash() {
+  if (!$splash) return;
+  $splash.classList.add('is-hidden');
+}
+
 function clearImageTransitionTimer() {
   if (imageTransitionTimer) {
     clearTimeout(imageTransitionTimer);
@@ -1091,7 +1136,7 @@ function updatePlayState() {
   document.body.classList.toggle('is-running', isRunning);
   $playBtn.classList.toggle('is-playing', isPlaying);
   $playBtn.setAttribute('aria-pressed', String(isPlaying));
-  $playBtn.textContent = isRunning ? 'stop' : 'play';
+  $playBtn.textContent = isRunning ? 'stop' : 'start';
   $playBtn.setAttribute('aria-label', isRunning ? 'Stop generation' : 'Start generation');
   $galleryBtn.classList.toggle('is-active', isGalleryVisible);
   $galleryBtn.setAttribute('aria-pressed', String(isGalleryVisible));
@@ -1126,6 +1171,18 @@ function stopGeneration() {
   interruptGeneration();
 }
 
+function startGeneration() {
+  if (isPlaying || isGenerating) return;
+  if (!ensureComfyHost()) return;
+
+  generationRun++;
+  currentRunPrompt = getPromptText();
+  isPlaying = true;
+  hideSplash();
+  updatePlayState();
+  startNextGeneration();
+}
+
 function resetLibrary() {
   generationRun++;
   isPlaying = false;
@@ -1154,14 +1211,10 @@ $playBtn.addEventListener('click', () => {
     return;
   }
 
-  if (!ensureComfyHost()) return;
-
-  generationRun++;
-  currentRunPrompt = getPromptText();
-  isPlaying = true;
-  updatePlayState();
-  startNextGeneration();
+  startGeneration();
 });
+
+$splash.addEventListener('click', startGeneration);
 
 $resetBtn.addEventListener('click', resetLibrary);
 

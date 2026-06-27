@@ -2,7 +2,7 @@
 
 Full-screen generative art library for a local ComfyUI workflow.
 
-Enter one prompt, press `play`, and the app continuously generates that prompt with a new random seed each time. The default prompt is:
+Enter one prompt, press `start`, and the app continuously generates that prompt with a new random seed each time. The default prompt is:
 
 ```text
 Quantum Art 35mm Film
