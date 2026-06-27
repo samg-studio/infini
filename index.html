@@ -199,6 +199,20 @@
       transition: opacity .35s ease;
       }
 
+    .prompt-dock.is-truncated::after {
+      content: '…';
+      position: absolute;
+      right: 22px;
+      bottom: 0;
+      color: rgba(255,255,255,.92);
+      font: inherit;
+      font-size: 18px;
+      font-weight: 400;
+      line-height: 1.35;
+      pointer-events: none;
+      text-shadow: 0 2px 18px rgba(0,0,0,.58);
+    }
+
     .prompt-input {
       width: 100%;
       appearance: none;
@@ -214,7 +228,7 @@
       min-height: 83px;
       max-height: 112px;
       outline: none;
-      overflow-y: auto;
+      overflow-y: hidden;
       padding: 0 22px 0 0;
       resize: none;
       scrollbar-width: none;
@@ -226,6 +240,21 @@
     body.is-prompt-focused .prompt-input,
     .prompt-dock.has-value .prompt-input {
       text-shadow: none;
+    }
+
+    .prompt-dock.is-truncated .prompt-input {
+      padding-right: 44px;
+    }
+
+    body.is-prompt-focused .prompt-input {
+      font-size: 22px;
+      min-height: 132px;
+      max-height: min(42dvh, 360px);
+      overflow-y: auto;
+    }
+
+    body.is-prompt-focused .prompt-dock::after {
+      display: none;
     }
 
     .prompt-input::-webkit-scrollbar {
@@ -354,6 +383,10 @@
       transition: opacity .25s ease;
       }
 
+    body.is-prompt-focused .prompt-clear {
+      top: 4px;
+    }
+
     .play-btn:hover,
     .play-btn.is-playing,
     .reset-btn:hover,
@@ -367,6 +400,10 @@
     .delete-btn.is-active {
       opacity: 1;
       }
+
+    .play-btn {
+      opacity: 1;
+    }
 
     .fill-btn {
       display: grid;
@@ -491,6 +528,10 @@
       align-items: center;
       justify-content: center;
       gap: 24px;
+    }
+
+    .grid-panel-action.is-active {
+      opacity: 1;
     }
 
     .delete-action {
@@ -1043,6 +1084,20 @@
         text-shadow: 0 2px 14px rgba(0,0,0,.68);
       }
 
+      .prompt-dock.is-truncated .prompt-input {
+        padding-right: 44px;
+      }
+
+      .prompt-dock.is-truncated::after {
+        font-size: 16px;
+      }
+
+      body.is-prompt-focused .prompt-input {
+        font-size: 21px;
+        min-height: 132px;
+        max-height: min(38dvh, 300px);
+      }
+
       .active-prompt {
         right: 18px;
         max-width: 48vw;
@@ -1207,8 +1262,6 @@
          <div class="top-controls">
            <button class="gallery-btn is-active" id="galleryBtn" type="button">gallery</button>
            <button class="grid-btn" id="gridBtn" type="button">grid</button>
-           <button class="download-btn" id="downloadBtn" type="button">download</button>
-           <button class="delete-btn" id="deleteBtn" type="button">delete</button>
            <button class="reset-btn" id="resetBtn" type="button">reset</button>
          </div>
          <div class="prompt-dock" id="promptDock">
@@ -1238,6 +1291,8 @@
 <div class="delete-panel" id="deletePanel" aria-hidden="true">
      <div class="delete-grid" id="deleteGrid"></div>
      <div class="delete-actions">
+       <button class="delete-action grid-panel-action download-btn" id="downloadBtn" type="button">download</button>
+       <button class="delete-action grid-panel-action delete-btn" id="deleteBtn" type="button">delete</button>
        <button class="delete-action" id="deleteConfirm" type="button">done</button>
        <button class="delete-action" id="deleteCancel" type="button" hidden>done</button>
      </div>
@@ -2349,6 +2404,22 @@ function updatePromptClearButton() {
   const hasValue = Boolean(($promptInput.value || '').trim());
   $promptDock.classList.toggle('has-value', hasValue);
   $promptClear.disabled = $promptInput.readOnly || !hasValue;
+  updatePromptDisplayState();
+}
+
+function getPromptDisplayText() {
+  return (($promptInput?.value || '').trim() || ($promptInput?.placeholder || '').trim());
+}
+
+function updatePromptDisplayState() {
+  if (!$promptInput || !$promptDock) return;
+
+  const text = getPromptDisplayText();
+  const isFocused = document.activeElement === $promptInput;
+  const isOverflowing = $promptInput.scrollHeight > $promptInput.clientHeight + 2;
+  const isLikelyLong = text.length > 72;
+  $promptDock.classList.toggle('has-display-text', Boolean(text));
+  $promptDock.classList.toggle('is-truncated', Boolean(text) && !isFocused && (isOverflowing || isLikelyLong));
 }
 
 function resizePromptInput() {
@@ -2357,6 +2428,7 @@ function resizePromptInput() {
   $promptInput.style.height = 'auto';
   const maxHeight = Number.parseFloat(getComputedStyle($promptInput).maxHeight) || 136;
   $promptInput.style.height = `${Math.min($promptInput.scrollHeight, maxHeight)}px`;
+  updatePromptDisplayState();
 }
 
 function schedulePromptResize() {
@@ -2370,6 +2442,19 @@ function updatePromptDemoPlaceholder() {
   $promptInput.placeholder = typedExample;
   resizePromptInput();
   schedulePromptResize();
+}
+
+function capturePromptDemoOnFocus() {
+  if (!$promptInput || ($promptInput.value || '').trim()) return;
+
+  const demoPrompt = currentDemoPrompt || ($promptInput.placeholder || '').trim();
+  if (!demoPrompt) return;
+
+  stopPromptDemo();
+  $promptInput.value = demoPrompt;
+  $promptInput.placeholder = '';
+  $promptInput.classList.remove('is-demo-fading');
+  updatePromptClearButton();
 }
 
 function stopPromptDemo() {
@@ -2702,6 +2787,10 @@ function renderGridPanel() {
     .filter(({ gen }) => gen.imgSrc && gen.key && (isBrowseGridMode || gen.imageInfo?.filename));
   const actionWord = isDownloadMode ? 'download' : (isDeleteMode ? 'delete' : 'view');
   const currentKey = generations[currentGenerationIndex]?.key;
+  const hasPanelItems = panelItems.length > 0;
+
+  $downloadBtn.disabled = !hasPanelItems;
+  $deleteBtn.disabled = !hasPanelItems;
 
   if (!panelItems.length) {
     const empty = document.createElement('div');
@@ -3155,11 +3244,15 @@ $promptInput.addEventListener('input', () => {
 });
 $promptInput.addEventListener('change', () => savePrompt($promptInput.value));
 $promptInput.addEventListener('focus', () => {
+  capturePromptDemoOnFocus();
   document.body.classList.add('is-prompt-focused');
+  resizePromptInput();
   schedulePromptResize();
 });
 $promptInput.addEventListener('blur', () => {
   document.body.classList.remove('is-prompt-focused');
+  resizePromptInput();
+  schedulePromptResize();
 });
 $promptInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -3177,7 +3270,6 @@ $promptClear.addEventListener('click', () => {
   resizePromptInput();
   updatePromptClearButton();
   startPromptDemo();
-  $promptInput.focus();
 });
 
 function setGalleryVisible(isVisible) {
