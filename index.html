@@ -186,7 +186,7 @@
     }
 
     .prompt-input::placeholder {
-      color: rgba(255,255,255,.36);
+      color: rgba(255,255,255,.3);
     }
 
     .prompt-input:focus {
@@ -842,6 +842,24 @@ const DEFAULT_PROMPT = 'Quantum Art 35mm Film';
 const PREVIOUS_DEFAULT_PROMPT = 'Quantum art';
 const API_STORAGE_KEY = 'infini_api_base';
 const PROMPT_STORAGE_KEY = 'infini_prompt';
+const PROMPT_EXAMPLES = [
+  'Quantum Art 35mm Film',
+  'Cinematic Kyoto rain garden, moss, lanterns, soft fog, 35mm film',
+  'Brutalist desert villa at blue hour, quiet luxury architecture photo',
+  'Japanese ink forest, silver river, soft wash, handmade paper texture',
+  'Moroccan courtyard garden, zellige tiles, morning sun, 35mm film',
+  'Amazon river at dawn, glass mist, birds, cinematic natural light',
+  'Swiss alpine observatory, snow light, quiet sci-fi design, 70mm film',
+  'Quantum 3D swirls, luminous topology, impossible glass, black field',
+  'Graphic wonder poster, prismatic geometry, Swiss grid, museum print',
+  'Oil paint storm over lavender fields, thick impasto, golden hour',
+  'Seoul neon rain alley, cinematic reflections, late night 35mm still',
+  'Sahara night caravan under stars, moonlit dunes, anamorphic film',
+  'Coral reef cathedral, bioluminescent haze, underwater cinema',
+  'Patagonia glacier lake, wind-cut clouds, nature documentary 35mm',
+  'Milan furniture atelier, chrome, walnut, linen, editorial design study',
+  'Istanbul rooftop at sunrise, gulls, domes, warm Kodak film grain'
+];
 let COMFY_HOST = getComfyHost();
 let generations = [];          // { title, imgSrc, createdAt }
 let isGenerating = false;
@@ -855,6 +873,11 @@ let latestPopIndex = -1;
 let currentRunPrompt = DEFAULT_PROMPT;
 let hasRemoteWork = false;
 let audioContext = null;
+let currentDemoPrompt = PROMPT_EXAMPLES[0] || DEFAULT_PROMPT;
+let demoPromptIndex = 0;
+let demoCharIndex = 0;
+let demoDirection = 1;
+let demoPromptTimer = null;
 
 /* ── persist to localStorage ── */
 function save() {
@@ -875,15 +898,23 @@ function cleanPrompt(value) {
 
 function loadPrompt() {
   try {
-    const storedPrompt = cleanPrompt(localStorage.getItem(PROMPT_STORAGE_KEY));
-    return storedPrompt === PREVIOUS_DEFAULT_PROMPT ? DEFAULT_PROMPT : storedPrompt;
+    const storedPrompt = (localStorage.getItem(PROMPT_STORAGE_KEY) || '').trim();
+    if (!storedPrompt || storedPrompt === PREVIOUS_DEFAULT_PROMPT || storedPrompt === DEFAULT_PROMPT) return '';
+    return storedPrompt;
   } catch {
-    return DEFAULT_PROMPT;
+    return '';
   }
 }
 
 function savePrompt(value) {
-  try { localStorage.setItem(PROMPT_STORAGE_KEY, cleanPrompt(value)); } catch {}
+  try {
+    const prompt = (value || '').trim();
+    if (prompt) {
+      localStorage.setItem(PROMPT_STORAGE_KEY, prompt);
+    } else {
+      localStorage.removeItem(PROMPT_STORAGE_KEY);
+    }
+  } catch {}
 }
 
 function isPrivateHost(hostname) {
@@ -1038,8 +1069,8 @@ async function generate(runId, promptText) {
       "57:13": {             // EmptySD3LatentImage
         "class_type": "EmptySD3LatentImage",
         "inputs": {
-          "width": 1200,
-          "height": 720,
+          "width": 2000,
+          "height": 1125,
           "batch_size": 1
         }
       },
@@ -1177,10 +1208,57 @@ let activeImageLayer = 0;
 let imageTransitionTimer = null;
 
 function getPromptText() {
-  const prompt = cleanPrompt($promptInput.value);
-  $promptInput.value = prompt;
-  savePrompt(prompt);
+  const typedPrompt = ($promptInput.value || '').trim();
+  const prompt = typedPrompt || currentDemoPrompt || DEFAULT_PROMPT;
+  savePrompt(typedPrompt);
   return prompt;
+}
+
+function updatePromptDemoPlaceholder() {
+  if (!$promptInput || ($promptInput.value || '').trim()) return;
+
+  const typedExample = currentDemoPrompt.slice(0, demoCharIndex);
+  $promptInput.placeholder = typedExample || currentDemoPrompt;
+}
+
+function schedulePromptDemo(delay) {
+  if (demoPromptTimer) clearTimeout(demoPromptTimer);
+  demoPromptTimer = setTimeout(advancePromptDemo, delay);
+}
+
+function advancePromptDemo() {
+  if (!PROMPT_EXAMPLES.length) return;
+
+  currentDemoPrompt = PROMPT_EXAMPLES[demoPromptIndex] || DEFAULT_PROMPT;
+  updatePromptDemoPlaceholder();
+
+  let delay = 48;
+  if (demoDirection > 0) {
+    demoCharIndex++;
+    if (demoCharIndex >= currentDemoPrompt.length) {
+      demoCharIndex = currentDemoPrompt.length;
+      demoDirection = -1;
+      delay = 1700;
+    }
+  } else {
+    demoCharIndex--;
+    delay = 24;
+    if (demoCharIndex <= 0) {
+      demoCharIndex = 0;
+      demoDirection = 1;
+      demoPromptIndex = (demoPromptIndex + 1) % PROMPT_EXAMPLES.length;
+      currentDemoPrompt = PROMPT_EXAMPLES[demoPromptIndex] || DEFAULT_PROMPT;
+      delay = 420;
+    }
+  }
+
+  schedulePromptDemo(delay);
+}
+
+function startPromptDemo() {
+  demoCharIndex = Math.max(1, demoCharIndex);
+  updatePromptDemoPlaceholder();
+  schedulePromptDemo(70);
 }
 
 function getAudioContext() {
@@ -1507,6 +1585,9 @@ $splash.addEventListener('click', () => startGeneration('splash'));
 
 $resetBtn.addEventListener('click', resetLibrary);
 
+$promptInput.addEventListener('input', () => {
+  if (!($promptInput.value || '').trim()) updatePromptDemoPlaceholder();
+});
 $promptInput.addEventListener('change', () => savePrompt($promptInput.value));
 $promptInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -1659,9 +1740,9 @@ function renderCarousel() {
 /* ═══════════════════════════════════════
    Init
    ═══════════════════════════════════════ */
-$promptInput.placeholder = DEFAULT_PROMPT;
 $promptInput.value = loadPrompt();
-currentRunPrompt = $promptInput.value;
+currentRunPrompt = $promptInput.value || currentDemoPrompt;
+startPromptDemo();
 smokeTestBridge();
 refreshRemoteWork();
 finishSplash();
