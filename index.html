@@ -1161,8 +1161,8 @@
 <div class="delete-panel" id="deletePanel" aria-hidden="true">
      <div class="delete-grid" id="deleteGrid"></div>
      <div class="delete-actions">
-       <button class="delete-action" id="deleteConfirm" type="button" disabled>delete selected</button>
-       <button class="delete-action" id="deleteCancel" type="button">cancel</button>
+       <button class="delete-action" id="deleteConfirm" type="button">done</button>
+       <button class="delete-action" id="deleteCancel" type="button" hidden>done</button>
      </div>
 </div>
 
@@ -2410,8 +2410,9 @@ function renderGridPanel() {
     empty.className = 'delete-empty';
     empty.textContent = `nothing to ${actionWord}`;
     $deleteGrid.appendChild(empty);
-    $deleteConfirm.disabled = true;
-    $deleteConfirm.textContent = `${actionWord} selected`;
+    $deleteConfirm.disabled = false;
+    $deleteConfirm.textContent = 'done';
+    $deleteCancel.hidden = true;
     return;
   }
 
@@ -2440,10 +2441,13 @@ function renderGridPanel() {
     $deleteGrid.appendChild(thumb);
   }
 
-  $deleteConfirm.disabled = selectedGridKeys.size === 0;
-  $deleteConfirm.textContent = selectedGridKeys.size > 0
+  const hasSelection = selectedGridKeys.size > 0;
+  $deleteConfirm.disabled = false;
+  $deleteConfirm.textContent = hasSelection
     ? `${actionWord} ${selectedGridKeys.size}`
-    : `${actionWord} selected`;
+    : 'done';
+  $deleteCancel.hidden = !hasSelection;
+  $deleteCancel.textContent = 'done';
 }
 
 function sanitizeDownloadName(value, fallback) {
@@ -2945,6 +2949,11 @@ $deleteBtn.addEventListener('click', () => {
 });
 
 $deleteConfirm.addEventListener('click', () => {
+  if (selectedGridKeys.size === 0) {
+    setGridMode('');
+    return;
+  }
+
   if (isDownloadMode) {
     downloadSelectedImages();
   } else if (isDeleteMode) {
