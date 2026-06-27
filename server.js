@@ -13,7 +13,7 @@ const stateDir = path.join(root, '.infini');
 const deletedStorePath = path.join(stateDir, 'deleted.json');
 const comfyOutputDir = resolveComfyOutputDir();
 
-const proxyPrefixes = ['/prompt', '/history', '/view', '/interrupt', '/queue', '/system_stats'];
+const proxyPrefixes = ['/prompt', '/history', '/view', '/interrupt', '/queue', '/system_stats', '/upload'];
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
   .split(',')
   .map((origin) => origin.trim())

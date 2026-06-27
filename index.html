@@ -179,11 +179,21 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 9px;
+      grid-column: 1;
+      grid-row: 1;
       }
 
     .play-btn {
       align-self: flex-start;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      grid-column: 3;
+      grid-row: 1;
       margin-top: 0;
+      min-height: 32px;
+      min-width: 42px;
+      touch-action: manipulation;
     }
 
     .reset-btn {
@@ -191,6 +201,8 @@
       }
 
     .prompt-dock {
+      grid-column: 2;
+      grid-row: 1;
       position: relative;
       width: 100%;
       border: 1px solid transparent;
@@ -198,6 +210,11 @@
       transform: none;
       transition: opacity .35s ease;
       }
+
+    body.is-prompt-focused .prompt-dock {
+      grid-column: 2 / 4;
+      z-index: 660;
+    }
 
     .prompt-preview {
       width: 100%;
@@ -213,7 +230,7 @@
       font-weight: 400;
       line-height: 1.35;
       overflow: hidden;
-      padding: 0 44px 0 0;
+      padding: 0 12px 0 0;
       text-align: left;
       text-shadow: 0 2px 18px rgba(0,0,0,.58);
       -webkit-box-orient: vertical;
@@ -240,7 +257,7 @@
       max-height: 4.26em;
       outline: none;
       overflow-y: hidden;
-      padding: 0 44px 0 0;
+      padding: 0 12px 0 0;
       position: absolute;
       inset: 0;
       opacity: 0;
@@ -263,7 +280,7 @@
       min-height: 144px;
       max-height: min(46dvh, 380px);
       overflow-y: auto;
-      padding: 0 44px 14px 0;
+      padding: 0 58px 14px 0;
       position: relative;
       opacity: 1;
       pointer-events: auto;
@@ -280,6 +297,55 @@
     .prompt-input::placeholder {
       color: rgba(255,255,255,.3);
       transition: color .55s ease;
+    }
+
+    .mode-panel {
+      display: none;
+      flex-wrap: wrap;
+      gap: 7px 12px;
+      margin-top: 12px;
+      max-width: min(100%, 780px);
+      opacity: .82;
+    }
+
+    body.mode-architecture .mode-panel,
+    body.mode-type .mode-panel {
+      display: flex;
+    }
+
+    .mode-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px 12px;
+    }
+
+    body.mode-architecture .type-options,
+    body.mode-type .architecture-options {
+      display: none;
+    }
+
+    .mode-option,
+    .mode-upload {
+      appearance: none;
+      background: none;
+      border: 0;
+      color: rgba(255,255,255,.58);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.15;
+      padding: 0;
+      text-align: left;
+      text-transform: lowercase;
+      transition: color .2s ease, opacity .2s ease;
+    }
+
+    .mode-option.is-active,
+    .mode-upload.has-file,
+    .mode-option:hover,
+    .mode-upload:hover {
+      color: #fff;
     }
 
     .prompt-input.is-demo-fading::placeholder {
@@ -299,8 +365,8 @@
       position: absolute;
       top: 1px;
       right: 0;
-      width: 22px;
-      height: 24px;
+      width: 32px;
+      height: 32px;
       appearance: none;
       background: none;
       border: 0;
@@ -317,11 +383,16 @@
     }
 
     .prompt-dock.has-value .prompt-clear {
-      opacity: .6;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.is-prompt-focused .prompt-dock.has-value .prompt-clear {
+      opacity: .68;
       pointer-events: auto;
     }
 
-    .prompt-dock.has-value .prompt-clear:hover {
+    body.is-prompt-focused .prompt-dock.has-value .prompt-clear:hover {
       opacity: 1;
     }
 
@@ -379,6 +450,8 @@
     .reset-btn,
     .gallery-btn,
     .grid-btn,
+    .architecture-btn,
+    .type-btn,
     .download-btn,
     .delete-btn,
     .fill-btn {
@@ -400,7 +473,19 @@
       }
 
     body.is-prompt-focused .prompt-clear {
-      top: 4px;
+      top: -3px;
+    }
+
+    body.is-prompt-focused .brand,
+    body.is-prompt-focused .top-controls,
+    body.is-prompt-focused .play-btn,
+    body.is-prompt-focused .fill-btn,
+    body.is-prompt-focused .carousel-track,
+    body.is-prompt-focused .studio-link,
+    body.is-prompt-focused .active-prompt {
+      filter: blur(7px);
+      opacity: .24;
+      pointer-events: none;
     }
 
     .play-btn:hover,
@@ -410,6 +495,10 @@
     .gallery-btn.is-active,
     .grid-btn:hover,
     .grid-btn.is-active,
+    .architecture-btn:hover,
+    .architecture-btn.is-active,
+    .type-btn:hover,
+    .type-btn.is-active,
     .download-btn:hover,
     .download-btn.is-active,
     .delete-btn:hover,
@@ -1105,7 +1194,7 @@
       .prompt-input {
         min-height: 4.26em;
         max-height: 4.26em;
-        padding-right: 44px;
+        padding-right: 12px;
       }
 
       body.is-prompt-focused .prompt-input {
@@ -1280,12 +1369,48 @@
          <div class="top-controls">
            <button class="gallery-btn is-active" id="galleryBtn" type="button">gallery</button>
            <button class="grid-btn" id="gridBtn" type="button">grid</button>
+           <button class="architecture-btn" id="architectureBtn" type="button">architecture</button>
+           <button class="type-btn" id="typeBtn" type="button">type</button>
            <button class="reset-btn" id="resetBtn" type="button">reset</button>
          </div>
          <div class="prompt-dock" id="promptDock">
            <button class="prompt-preview" id="promptPreview" type="button" aria-label="Edit prompt"></button>
            <textarea class="prompt-input" id="promptInput" rows="2" autocomplete="off" spellcheck="false" aria-label="Prompt"></textarea>
            <button class="prompt-clear" id="promptClear" type="button" aria-label="Clear prompt">x</button>
+           <div class="mode-panel" id="modePanel" aria-label="Mode options">
+             <input class="mode-file-input" id="architectureUpload" type="file" accept="image/*" hidden>
+             <div class="mode-options architecture-options" aria-label="Architecture options">
+               <button class="mode-upload" id="architectureUploadBtn" type="button">upload plan</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="structure" data-value="exact">exact</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="structure" data-value="loose">loose</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="scene" data-value="exterior">exterior</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="scene" data-value="interior">interior</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="scene" data-value="facade">facade</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="scene" data-value="room">room</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="style" data-value="modern">modern</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="style" data-value="japandi">japandi</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="style" data-value="brutalist">brutalist</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="style" data-value="chalet">chalet</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="material" data-value="wood and stone">wood stone</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="material" data-value="concrete and glass">concrete glass</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="light" data-value="golden hour">golden hour</button>
+               <button class="mode-option" type="button" data-mode="architecture" data-key="light" data-value="dusk">dusk</button>
+             </div>
+             <div class="mode-options type-options" aria-label="Type options">
+               <button class="mode-option" type="button" data-mode="type" data-key="format" data-value="poster">poster</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="format" data-value="story">story</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="format" data-value="web hero">hero</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="format" data-value="product card">product</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="style" data-value="luxury editorial">luxury</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="style" data-value="Apple keynote minimal">keynote</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="style" data-value="playful cinematic">playful</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="palette" data-value="exact restrained palette">restrained</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="palette" data-value="bold campaign palette">bold</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="position" data-value="centered">centered</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="position" data-value="lower third">lower third</button>
+               <button class="mode-option" type="button" data-mode="type" data-key="position" data-value="badge overlay">badge</button>
+             </div>
+           </div>
          </div>
          <button class="play-btn" id="playBtn" type="button">start</button>
        </div>
@@ -1486,8 +1611,30 @@ const CIRCUMSTANCE_DETAILS = [
 ];
 let COMFY_HOST = getComfyHost();
 const CLIENT_ID = getClientId();
+const MODE_ART = 'art';
+const MODE_ARCHITECTURE = 'architecture';
+const MODE_TYPE = 'type';
+const VALID_MODES = new Set([MODE_ART, MODE_ARCHITECTURE, MODE_TYPE]);
 let generations = [];          // { title, imgSrc, imageInfo, key, createdAt }
 let deletedImageKeys = new Set();
+let activeMode = VALID_MODES.has(URL_PARAMS.get('mode')) ? URL_PARAMS.get('mode') : MODE_ART;
+let architectureFile = null;
+let architectureSourceImage = null;
+let modeSelections = {
+  architecture: {
+    structure: 'exact',
+    scene: 'exterior',
+    style: 'modern',
+    material: 'wood and stone',
+    light: 'golden hour'
+  },
+  type: {
+    format: 'poster',
+    style: 'luxury editorial',
+    palette: 'bold campaign palette',
+    position: 'centered'
+  }
+};
 let isGenerating = false;
 let isPlaying = false;
 let isGalleryVisible = true;
@@ -1588,19 +1735,59 @@ function buildPromptVariation(basePrompt, index = 0) {
   ].join(' ');
 }
 
+function buildArchitecturePrompt(basePrompt) {
+  const prompt = cleanPrompt(basePrompt);
+  const options = modeSelections.architecture;
+  const structureLine = options.structure === 'exact'
+    ? 'Keep the exact structure, openings, roof lines, walls, room layout, and main proportions from the uploaded plan.'
+    : 'Allow a tasteful architectural redesign while preserving the core structure and spatial logic from the uploaded plan.';
+
+  return [
+    prompt,
+    'Architecture mode. Generate polished architectural variants from the uploaded Canny structure.',
+    structureLine,
+    `${options.scene} visualization, ${options.style} architecture, ${options.material} material palette, ${options.light} lighting.`,
+    'Randomize textures, finishes, facade details, furniture or landscaping between generations while keeping the structural lines readable.',
+    'Realistic architecture presentation image, premium design photography, clean composition.'
+  ].join(' ');
+}
+
+function buildTypePrompt(basePrompt) {
+  const prompt = cleanPrompt(basePrompt);
+  const options = modeSelections.type;
+
+  return [
+    'Type and design mode for Ideogram 4.',
+    `Exact text / concept: ${prompt}`,
+    `Format: ${options.format}. Style: ${options.style}. Palette: ${options.palette}. Text placement: ${options.position}.`,
+    'Precise readable typography, balanced hierarchy, premium campaign layout, clean background, no misspelled text.'
+  ].join(' ');
+}
+
+function buildModePrompt(basePrompt) {
+  if (activeMode === MODE_ARCHITECTURE) return buildArchitecturePrompt(basePrompt);
+  if (activeMode === MODE_TYPE) return buildTypePrompt(basePrompt);
+  return basePrompt;
+}
+
 function getSeedPrompt() {
   const typedPrompt = getTypedPrompt();
   return cleanPrompt(typedPrompt || autoPromptSeed || currentDemoPrompt || DEFAULT_PROMPT);
 }
 
 function beginPromptRun() {
-  runBasePrompt = getSeedPrompt();
+  runBasePrompt = buildModePrompt(getSeedPrompt());
   runVariationIndex = 0;
   currentRunPrompt = runBasePrompt;
   if (!getTypedPrompt()) autoPromptSeed = '';
 }
 
 function nextPromptVariation() {
+  if (activeMode === MODE_ARCHITECTURE || activeMode === MODE_TYPE) {
+    currentRunPrompt = runBasePrompt;
+    return currentRunPrompt;
+  }
+
   currentRunPrompt = buildPromptVariation(runBasePrompt, runVariationIndex++);
   return currentRunPrompt;
 }
@@ -2038,11 +2225,17 @@ async function pruneMissingGenerations() {
 }
 
 function getHistoryPrompt(historyItem) {
-  return historyItem?.prompt?.[2]?.['58']?.inputs?.value || DEFAULT_PROMPT;
+  const workflow = historyItem?.prompt?.[2] || {};
+  return workflow['58']?.inputs?.value ||
+    workflow['2']?.inputs?.prompt ||
+    workflow['70']?.inputs?.text ||
+    workflow['arch:45']?.inputs?.text ||
+    DEFAULT_PROMPT;
 }
 
 function getHistoryDimensions(historyItem) {
-  const latentInputs = historyItem?.prompt?.[2]?.['57:13']?.inputs || {};
+  const workflow = historyItem?.prompt?.[2] || {};
+  const latentInputs = workflow['57:13']?.inputs || workflow['2']?.inputs || {};
   return {
     width: Number(latentInputs.width) || 1200,
     height: Number(latentInputs.height) || 675
@@ -2221,14 +2414,8 @@ async function syncRemoteHistory() {
   }
 }
 
-async function generate(runId, promptText) {
-  const prompt = cleanPrompt(promptText);
-  const dimensions = getGenerationDimensions();
-  currentRunDimensions = dimensions;
-  applyArtOrientation(dimensions.width, dimensions.height);
-  resetGenerationProgress();
-  await openProgressSocket();
-  const workflow = {
+function buildArtWorkflow(prompt, dimensions) {
+  return {
       "57:28": {             // UNETLoader
         "class_type": "UNETLoader",
         "inputs": {
@@ -2314,6 +2501,206 @@ async function generate(runId, promptText) {
         }
       }
     };
+}
+
+function buildTypeWorkflow(prompt, dimensions) {
+  return {
+    "1": {
+      "class_type": "Ideogram4PipelineLoader",
+      "inputs": {
+        "model_weights": "4.0 FP8"
+      }
+    },
+    "2": {
+      "class_type": "Ideogram4Generate",
+      "inputs": {
+        "pipeline": ["1", 0],
+        "prompt": prompt,
+        "width": dimensions.width,
+        "height": dimensions.height,
+        "sampler_preset": "4.0 Turbo 12",
+        "num_steps": 12,
+        "guidance_scale": 7,
+        "mu": 0.5,
+        "std": 1.75,
+        "seed": Math.floor(Math.random() * 999999999)
+      }
+    },
+    "3": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Infinite_Type",
+        "images": ["2", 0]
+      }
+    }
+  };
+}
+
+async function uploadArchitectureImage() {
+  if (architectureSourceImage) return architectureSourceImage;
+  if (!architectureFile) throw new Error('Upload a plan first');
+
+  const form = new FormData();
+  form.append('image', architectureFile, architectureFile.name || 'infini-architecture-source.png');
+  form.append('type', 'input');
+  form.append('overwrite', 'true');
+
+  const res = await apiFetch('/upload/image', { method: 'POST', body: form }, 45000);
+  if (!res.ok) throw new Error('Architecture upload failed');
+
+  const data = await res.json();
+  architectureSourceImage = {
+    filename: data.name || data.filename || architectureFile.name,
+    subfolder: data.subfolder || '',
+    type: data.type || 'input'
+  };
+  return architectureSourceImage;
+}
+
+async function buildArchitectureWorkflow(prompt) {
+  const image = await uploadArchitectureImage();
+  const imageName = image.subfolder ? `${image.subfolder}/${image.filename}` : image.filename;
+
+  return {
+    "58": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": imageName
+      }
+    },
+    "62": {
+      "class_type": "ImageScaleToMaxDimension",
+      "inputs": {
+        "image": ["58", 0],
+        "upscale_method": "lanczos",
+        "largest_size": 1024
+      }
+    },
+    "57": {
+      "class_type": "Canny",
+      "inputs": {
+        "image": ["62", 0],
+        "low_threshold": 0.1,
+        "high_threshold": 0.32
+      }
+    },
+    "arch:39": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen_3_4b.safetensors",
+        "type": "lumina2",
+        "device": "default"
+      }
+    },
+    "arch:40": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "ae.safetensors"
+      }
+    },
+    "arch:46": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "z_image_turbo_bf16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "arch:64": {
+      "class_type": "ModelPatchLoader",
+      "inputs": {
+        "name": "Z-Image-Turbo-Fun-Controlnet-Union.safetensors"
+      }
+    },
+    "arch:60": {
+      "class_type": "QwenImageDiffsynthControlnet",
+      "inputs": {
+        "model": ["arch:46", 0],
+        "model_patch": ["arch:64", 0],
+        "vae": ["arch:40", 0],
+        "image": ["57", 0],
+        "strength": 1
+      }
+    },
+    "arch:47": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "model": ["arch:60", 0],
+        "shift": 3
+      }
+    },
+    "arch:45": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": ["arch:39", 0],
+        "text": prompt
+      }
+    },
+    "arch:42": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": ["arch:45", 0]
+      }
+    },
+    "arch:69": {
+      "class_type": "GetImageSize",
+      "inputs": {
+        "image": ["57", 0]
+      }
+    },
+    "arch:41": {
+      "class_type": "EmptySD3LatentImage",
+      "inputs": {
+        "width": ["arch:69", 0],
+        "height": ["arch:69", 1],
+        "batch_size": 1
+      }
+    },
+    "arch:44": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": Math.floor(Math.random() * 999999999),
+        "steps": 9,
+        "cfg": 1,
+        "sampler_name": "res_multistep",
+        "scheduler": "simple",
+        "denoise": 1,
+        "model": ["arch:47", 0],
+        "positive": ["arch:45", 0],
+        "negative": ["arch:42", 0],
+        "latent_image": ["arch:41", 0]
+      }
+    },
+    "arch:43": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": ["arch:44", 0],
+        "vae": ["arch:40", 0]
+      }
+    },
+    "9": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Infinite_Architecture",
+        "images": ["arch:43", 0]
+      }
+    }
+  };
+}
+
+async function buildWorkflow(mode, prompt, dimensions) {
+  if (mode === MODE_TYPE) return buildTypeWorkflow(prompt, dimensions);
+  if (mode === MODE_ARCHITECTURE) return buildArchitectureWorkflow(prompt);
+  return buildArtWorkflow(prompt, dimensions);
+}
+
+async function generate(runId, promptText) {
+  const prompt = cleanPrompt(promptText);
+  const dimensions = getGenerationDimensions();
+  currentRunDimensions = dimensions;
+  applyArtOrientation(dimensions.width, dimensions.height);
+  resetGenerationProgress();
+  await openProgressSocket();
+  const workflow = await buildWorkflow(activeMode, prompt, dimensions);
 
   try {
     const res = await apiFetch('/prompt', {
@@ -2385,6 +2772,8 @@ const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
 const $galleryBtn   = document.getElementById('galleryBtn');
 const $gridBtn      = document.getElementById('gridBtn');
+const $architectureBtn = document.getElementById('architectureBtn');
+const $typeBtn      = document.getElementById('typeBtn');
 const $downloadBtn  = document.getElementById('downloadBtn');
 const $deleteBtn    = document.getElementById('deleteBtn');
 const $fillBtn      = document.getElementById('fillBtn');
@@ -2392,6 +2781,9 @@ const $promptDock   = document.getElementById('promptDock');
 const $promptPreview = document.getElementById('promptPreview');
 const $promptInput  = document.getElementById('promptInput');
 const $promptClear  = document.getElementById('promptClear');
+const $architectureUpload = document.getElementById('architectureUpload');
+const $architectureUploadBtn = document.getElementById('architectureUploadBtn');
+const $modeOptions = [...document.querySelectorAll('.mode-option')];
 const $activePrompt = document.getElementById('activePrompt');
 const $splash       = document.getElementById('splash');
 const $carouselTrack = document.getElementById('carouselTrack');
@@ -2414,10 +2806,34 @@ let carouselStepX = 0;
 let carouselDidDrag = false;
 let carouselSuppressClick = false;
 let carouselWheelDelta = 0;
+let stopRequestId = 0;
 
 function getPromptText() {
   savePrompt(getTypedPrompt());
   return getSeedPrompt();
+}
+
+function setActiveMode(mode) {
+  activeMode = activeMode === mode ? MODE_ART : mode;
+  document.body.classList.toggle('mode-architecture', activeMode === MODE_ARCHITECTURE);
+  document.body.classList.toggle('mode-type', activeMode === MODE_TYPE);
+  updateModeControls();
+}
+
+function updateModeControls() {
+  $architectureBtn.classList.toggle('is-active', activeMode === MODE_ARCHITECTURE);
+  $architectureBtn.setAttribute('aria-pressed', String(activeMode === MODE_ARCHITECTURE));
+  $typeBtn.classList.toggle('is-active', activeMode === MODE_TYPE);
+  $typeBtn.setAttribute('aria-pressed', String(activeMode === MODE_TYPE));
+
+  $modeOptions.forEach((button) => {
+    const { mode, key, value } = button.dataset;
+    button.classList.toggle('is-active', modeSelections[mode]?.[key] === value);
+  });
+
+  const uploadName = architectureFile?.name || architectureSourceImage?.filename || '';
+  $architectureUploadBtn.textContent = uploadName ? `plan ${uploadName}` : 'upload plan';
+  $architectureUploadBtn.classList.toggle('has-file', Boolean(uploadName));
 }
 
 function updatePromptClearButton() {
@@ -3087,6 +3503,7 @@ function updatePlayState() {
   $galleryBtn.setAttribute('aria-pressed', String(isGalleryVisible));
   $gridBtn.classList.toggle('is-active', isBrowseGridMode);
   $gridBtn.setAttribute('aria-pressed', String(isBrowseGridMode));
+  updateModeControls();
   $downloadBtn.classList.toggle('is-active', isDownloadMode);
   $downloadBtn.setAttribute('aria-pressed', String(isDownloadMode));
   $deleteBtn.classList.toggle('is-active', isDeleteMode);
@@ -3138,6 +3555,7 @@ function buildTailnetLaunchUrl(promptText, options = {}) {
   const url = new URL(`${COMFY_HOST.replace(/\/+$/, '')}/`);
   const prompt = cleanPrompt(promptText);
   if (prompt) url.searchParams.set('prompt', prompt);
+  if (activeMode !== MODE_ART) url.searchParams.set('mode', activeMode);
   if (options.auto) url.searchParams.set('auto', '1');
   if (options.start) url.searchParams.set('start', '1');
   return url.toString();
@@ -3166,6 +3584,7 @@ function launchTailnetApp(source = 'menu', promptText = getPromptText(), isAutoP
 
 async function stopGeneration() {
   playWaveSound('stop');
+  const stopToken = ++stopRequestId;
   generationRun++;
   isPlaying = false;
   isGenerating = false;
@@ -3176,17 +3595,26 @@ async function stopGeneration() {
   closeProgressSocket();
   updatePlayState();
   await stopComfyWork();
-  setTimeout(refreshRemoteWork, 750);
+  setTimeout(async () => {
+    if (stopRequestId !== stopToken || isPlaying || isGenerating) return;
+    await stopComfyWork();
+    refreshRemoteWork();
+  }, 850);
 }
 
 function startGeneration(source = 'menu') {
   if (isPlaying || isGenerating) return;
   if (!ensureComfyHost()) return;
   if (isGridPanelOpen()) setGridMode('');
+  if (activeMode === MODE_ARCHITECTURE && !architectureFile && !architectureSourceImage) {
+    $architectureUpload.click();
+    return;
+  }
+  stopRequestId++;
   const typedPrompt = getTypedPrompt();
   const seedPrompt = getSeedPrompt();
 
-  if (shouldUseTailnetOrigin()) {
+  if (shouldUseTailnetOrigin() && activeMode !== MODE_ARCHITECTURE) {
     launchTailnetApp(source, seedPrompt, !typedPrompt);
     return;
   }
@@ -3234,7 +3662,9 @@ function resetLibrary() {
   stopComfyWork();
 }
 
-$playBtn.addEventListener('click', () => {
+$playBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   if (isPlaying || isGenerating || hasRemoteWork) {
     stopGeneration();
     return;
@@ -3385,6 +3815,39 @@ $galleryBtn.addEventListener('click', () => {
 
 $gridBtn.addEventListener('click', () => {
   setBrowseGridMode(!isBrowseGridMode);
+});
+
+$architectureBtn.addEventListener('click', () => {
+  setActiveMode(MODE_ARCHITECTURE);
+});
+
+$typeBtn.addEventListener('click', () => {
+  setActiveMode(MODE_TYPE);
+});
+
+$architectureUploadBtn.addEventListener('click', () => {
+  $architectureUpload.click();
+});
+
+$architectureUpload.addEventListener('change', () => {
+  architectureFile = $architectureUpload.files?.[0] || null;
+  architectureSourceImage = null;
+  if (architectureFile) activeMode = MODE_ARCHITECTURE;
+  updateModeControls();
+  document.body.classList.toggle('mode-architecture', activeMode === MODE_ARCHITECTURE);
+  document.body.classList.toggle('mode-type', activeMode === MODE_TYPE);
+});
+
+$modeOptions.forEach((button) => {
+  button.addEventListener('click', () => {
+    const { mode, key, value } = button.dataset;
+    if (!modeSelections[mode] || !key) return;
+    modeSelections[mode][key] = value;
+    activeMode = mode;
+    document.body.classList.toggle('mode-architecture', activeMode === MODE_ARCHITECTURE);
+    document.body.classList.toggle('mode-type', activeMode === MODE_TYPE);
+    updateModeControls();
+  });
 });
 
 $downloadBtn.addEventListener('click', () => {
