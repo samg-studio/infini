@@ -187,12 +187,14 @@
       align-self: flex-start;
       display: flex;
       align-items: flex-start;
-      justify-content: flex-start;
-      grid-column: 3;
-      grid-row: 1;
+      justify-content: flex-end;
+      position: fixed;
+      top: 86px;
+      right: 48px;
       margin-top: 0;
       min-height: 32px;
       min-width: 42px;
+      text-align: right;
       touch-action: manipulation;
     }
 
@@ -204,7 +206,8 @@
       grid-column: 2;
       grid-row: 1;
       position: relative;
-      width: 100%;
+      justify-self: center;
+      width: min(100%, 620px);
       border: 1px solid transparent;
       border-radius: 0;
       transform: none;
@@ -229,9 +232,10 @@
       font-size: 18px;
       font-weight: 400;
       line-height: 1.35;
+      max-height: 4.05em;
       overflow: hidden;
       padding: 0 12px 0 0;
-      text-align: left;
+      text-align: center;
       text-shadow: 0 2px 18px rgba(0,0,0,.58);
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 3;
@@ -264,7 +268,7 @@
       pointer-events: none;
       resize: none;
       scrollbar-width: none;
-      text-align: left;
+      text-align: center;
       transition: color .25s ease, opacity .2s ease, text-shadow .25s ease;
       white-space: pre-wrap;
     }
@@ -301,11 +305,17 @@
 
     .mode-panel {
       display: none;
+      position: fixed;
+      top: 126px;
+      right: 48px;
+      width: min(340px, 28vw);
       flex-wrap: wrap;
       gap: 7px 12px;
-      margin-top: 12px;
-      max-width: min(100%, 780px);
+      justify-content: flex-start;
+      margin-top: 0;
+      max-width: none;
       opacity: .82;
+      text-align: left;
     }
 
     body.mode-architecture .mode-panel,
@@ -317,6 +327,8 @@
       display: flex;
       flex-wrap: wrap;
       gap: 7px 12px;
+      justify-content: flex-start;
+      text-align: left;
     }
 
     body.mode-architecture .type-options,
@@ -1110,12 +1122,21 @@
       .brand { font-size: 30px; }
       .title-stack { gap: 12px; }
       .interface-grid {
-        grid-template-columns: 86px minmax(160px, 1fr) auto;
+        grid-template-columns: 86px minmax(160px, 1fr);
         column-gap: 22px;
+      }
+      .play-btn {
+        top: 70px;
+        right: 20px;
       }
       .top-controls { gap: 9px; }
       .prompt-dock {
-        width: 100%;
+        width: min(100%, 560px);
+      }
+      .mode-panel {
+        top: 108px;
+        right: 20px;
+        width: min(300px, 34vw);
       }
       .prompt-input {
         font-size: 17px;
@@ -1161,8 +1182,13 @@
       }
 
       .interface-grid {
-        grid-template-columns: 64px minmax(0, 1fr) auto;
-        column-gap: 10px;
+        grid-template-columns: 64px minmax(0, 1fr);
+        column-gap: 14px;
+      }
+
+      .play-btn {
+        top: calc(env(safe-area-inset-top) + 54px);
+        right: 18px;
       }
 
       .brand {
@@ -1176,9 +1202,21 @@
       .prompt-dock {
         position: relative;
         top: auto;
-        width: 100%;
+        width: min(100%, calc(100vw - 126px));
         max-width: none;
         z-index: 620;
+      }
+
+      .mode-panel {
+        top: calc(env(safe-area-inset-top) + 112px);
+        right: 18px;
+        width: min(220px, 46vw);
+        gap: 7px 10px;
+      }
+
+      .mode-option,
+      .mode-upload {
+        font-size: 12px;
       }
 
       .prompt-preview,
@@ -1202,7 +1240,7 @@
         line-height: 1.45;
         min-height: 144px;
         max-height: min(42dvh, 340px);
-        padding-bottom: 14px;
+        padding: 0 44px 14px 0;
       }
 
       .active-prompt {
@@ -3718,7 +3756,7 @@ $promptPreview.addEventListener('click', () => {
   $promptInput.focus();
 });
 
-$promptClear.addEventListener('click', () => {
+function clearPromptContent() {
   if ($promptClear.disabled) return;
 
   $promptInput.value = '';
@@ -3726,6 +3764,18 @@ $promptClear.addEventListener('click', () => {
   resizePromptInput();
   updatePromptClearButton();
   startPromptDemo();
+  $promptInput.focus();
+}
+
+$promptClear.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  clearPromptContent();
+});
+
+$promptClear.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
 });
 
 function setGalleryVisible(isVisible) {
