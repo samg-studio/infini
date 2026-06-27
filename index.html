@@ -437,80 +437,37 @@
 
     .spinner {
       position: absolute;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,.75);
-      z-index: 10;
+      right: clamp(14px, 2vw, 24px);
+      bottom: clamp(14px, 2vw, 24px);
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 12;
+      transition: opacity .7s ease;
       }
-    .spinner.show { display: flex; }
+    .spinner.show { opacity: 1; }
 
-    .infinity-loader {
-      width: 86px;
-      height: 48px;
-      perspective: 520px;
-      transform-style: preserve-3d;
-      animation: roastSpin 1.3s cubic-bezier(.48,.02,.52,.98) infinite;
-      filter: drop-shadow(0 0 18px rgba(255,255,255,.18));
-      }
-
-    .infinity-loader svg {
-      width: 100%;
-      height: 100%;
+    .generation-mark {
+      color: #fff;
       display: block;
-      overflow: visible;
+      font-size: clamp(38px, 5vw, 72px);
+      font-weight: 800;
+      line-height: 1;
+      text-shadow:
+        0 0 18px rgba(255,255,255,.22),
+        0 5px 24px rgba(0,0,0,.62);
+      animation: generationMarkFade 2.8s ease-in-out infinite;
       }
 
-    .loader-infinity-main,
-    .loader-infinity-right {
-      fill: none;
-      stroke: rgba(255,255,255,.95);
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-width: 6;
-      vector-effect: non-scaling-stroke;
-      }
-
-    .loader-infinity-main {
-      opacity: .86;
-      }
-
-    .loader-infinity-right {
-      opacity: .9;
-      stroke-width: 7;
-      transform-box: fill-box;
-      transform-origin: center;
-      animation: rightLoopTwist .65s ease-in-out infinite;
-      }
-
-    @keyframes roastSpin {
-      0% {
-        filter: drop-shadow(0 0 16px rgba(255,255,255,.16)) blur(0);
-        transform: rotateY(0deg) rotateZ(-1deg);
-      }
-      28% {
-        filter: drop-shadow(0 0 20px rgba(255,255,255,.22)) blur(.7px);
-      }
-      50% {
-        filter: drop-shadow(0 0 22px rgba(255,255,255,.24)) blur(1.25px);
-        transform: rotateY(180deg) rotateZ(1deg);
-      }
-      72% {
-        filter: drop-shadow(0 0 20px rgba(255,255,255,.2)) blur(.7px);
-      }
-      100% {
-        filter: drop-shadow(0 0 16px rgba(255,255,255,.16)) blur(0);
-        transform: rotateY(360deg) rotateZ(-1deg);
-      }
-    }
-
-    @keyframes rightLoopTwist {
+    @keyframes generationMarkFade {
       0%, 100% {
-        transform: scaleX(1) skewX(0deg);
+        opacity: .22;
+        transform: scale(.98);
       }
       50% {
-        transform: scaleX(.72) skewX(-16deg);
+        opacity: .92;
+        transform: scale(1.02);
       }
     }
 
@@ -748,14 +705,15 @@
 
       .image-wrap {
         position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100svh;
-        height: 100dvh;
+        left: 50%;
+        top: 50%;
+        width: calc(100vw - 36px);
+        height: auto;
         margin-top: 0;
         max-width: none;
-        aspect-ratio: auto;
-        border-radius: 0;
+        aspect-ratio: 16 / 9;
+        border-radius: 8px;
+        transform: translate(-50%, -50%);
         z-index: 0;
       }
 
@@ -792,6 +750,7 @@
       aspect-ratio: auto;
       border-radius: 0;
       background: #000;
+      transform: none;
       z-index: 0;
     }
 
@@ -834,12 +793,7 @@
      <img class="main-img" id="mainImgB" src="" alt="" />
      <div class="placeholder" id="placeholder"></div>
      <div class="spinner" id="spinner">
-       <div class="infinity-loader" aria-hidden="true">
-         <svg viewBox="0 0 120 60" focusable="false">
-           <path class="loader-infinity-main" d="M12 30C22 8 46 8 60 30C74 52 98 52 108 30C98 8 74 8 60 30C46 52 22 52 12 30Z" />
-           <path class="loader-infinity-right" d="M60 30C74 8 98 8 108 30C98 52 74 52 60 30Z" />
-         </svg>
-       </div>
+       <span class="generation-mark" aria-hidden="true">∞</span>
      </div>
 </div>
 
@@ -1269,23 +1223,31 @@ function playWaveSound(kind = 'start') {
   const ctx = getAudioContext();
   if (!ctx) return;
 
+  const profiles = {
+    splash: { duration: 2.7, peak: .42, filter: 1400, delay: .28, feedback: .22 },
+    start: { duration: 1.35, peak: .34, filter: 1900, delay: .28, feedback: .22 },
+    stop: { duration: 1.45, peak: .18, filter: 1180, delay: .34, feedback: .16 },
+    transition: { duration: 1.8, peak: .13, filter: 1320, delay: .42, feedback: .12 },
+    reset: { duration: 1.65, peak: .24, filter: 1650, delay: .18, feedback: .1 }
+  };
+  const profile = profiles[kind] || profiles.start;
   const now = ctx.currentTime + .025;
-  const duration = kind === 'splash' ? 2.7 : 1.35;
+  const duration = profile.duration;
   const output = ctx.createGain();
   const filter = ctx.createBiquadFilter();
   const delay = ctx.createDelay();
   const feedback = ctx.createGain();
 
   output.gain.setValueAtTime(0.0001, now);
-  output.gain.exponentialRampToValueAtTime(kind === 'splash' ? .42 : .34, now + .12);
+  output.gain.exponentialRampToValueAtTime(profile.peak, now + .12);
   output.gain.exponentialRampToValueAtTime(0.0001, now + duration + .55);
 
   filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(kind === 'splash' ? 1400 : 1900, now);
+  filter.frequency.setValueAtTime(profile.filter, now);
   filter.Q.setValueAtTime(.5, now);
 
-  delay.delayTime.setValueAtTime(.28, now);
-  feedback.gain.setValueAtTime(.22, now);
+  delay.delayTime.setValueAtTime(profile.delay, now);
+  feedback.gain.setValueAtTime(profile.feedback, now);
 
   output.connect(filter).connect(ctx.destination);
   filter.connect(delay).connect(feedback).connect(delay);
@@ -1296,6 +1258,18 @@ function playWaveSound(kind = 'start') {
     addTone(ctx, output, now + .18, duration * .92, 264, 396, .075, .18);
     addTone(ctx, output, now + .62, duration * .66, 528, 704, .045, 0);
     addNoiseWash(ctx, output, now, duration, .055);
+  } else if (kind === 'stop') {
+    addTone(ctx, output, now, duration, 330, 196, .052, -.1);
+    addTone(ctx, output, now + .12, duration * .9, 220, 147, .042, .12);
+    addNoiseWash(ctx, output, now, duration * .82, .018);
+  } else if (kind === 'transition') {
+    addTone(ctx, output, now, duration, 220, 294, .036, -.16);
+    addTone(ctx, output, now + .22, duration * .88, 440, 392, .028, .16);
+    addNoiseWash(ctx, output, now + .05, duration * .9, .015);
+  } else if (kind === 'reset') {
+    addTone(ctx, output, now, duration, 523, 392, .05, -.08);
+    addTone(ctx, output, now + .1, duration * .84, 262, 131, .058, .08);
+    addNoiseWash(ctx, output, now, duration, .028);
   } else {
     addTone(ctx, output, now, duration, 196, 330, .085, -.12);
     addTone(ctx, output, now + .08, duration * .92, 392, 660, .06, .12);
@@ -1353,11 +1327,15 @@ function loadMainImage(src) {
   const nextLayerIndex = 1 - activeImageLayer;
   const nextLayer = $imageLayers[nextLayerIndex];
   const hasCurrentImage = Boolean(currentLayer.getAttribute('src'));
+  let didHandleLoad = false;
 
   nextLayer.onload = () => {
+    if (didHandleLoad) return;
+    didHandleLoad = true;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (hasCurrentImage) {
+          playWaveSound('transition');
           currentLayer.className = 'main-img is-exiting';
           $imageWrap.classList.add('is-transitioning');
         } else {
@@ -1415,7 +1393,7 @@ function updatePlayState() {
   $fillBtn.setAttribute('aria-label', isFillMode ? 'Exit fullscreen' : 'Enter fullscreen');
   $promptInput.readOnly = isRunning;
   $activePrompt.textContent = isRunning ? currentRunPrompt : '';
-  $spinner.classList.toggle('show', isGenerating && generations.length === 0);
+  $spinner.classList.toggle('show', isGenerating || hasRemoteWork);
   updateGalleryVisibility();
 }
 
@@ -1433,6 +1411,7 @@ function startNextGeneration() {
 }
 
 async function stopGeneration() {
+  playWaveSound('stop');
   generationRun++;
   isPlaying = false;
   isGenerating = false;
@@ -1458,6 +1437,7 @@ function startGeneration(source = 'menu') {
 }
 
 function resetLibrary() {
+  playWaveSound('reset');
   generationRun++;
   isPlaying = false;
   isGenerating = false;
