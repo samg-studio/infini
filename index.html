@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="infini">
+<link rel="manifest" href="manifest.webmanifest">
 <title>infini</title>
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1379,6 +1385,53 @@ function findGeneratedImage(historyItem) {
   return null;
 }
 
+function buildImageUrl(imgInfo) {
+  if (!imgInfo?.filename) return '';
+
+  const params = new URLSearchParams({
+    filename: imgInfo.filename,
+    type: imgInfo.type || 'output'
+  });
+  if (imgInfo.subfolder) params.set('subfolder', imgInfo.subfolder);
+  return `${COMFY_HOST}/view?${params}`;
+}
+
+function getHistoryPrompt(historyItem) {
+  return historyItem?.prompt?.[2]?.['58']?.inputs?.value || DEFAULT_PROMPT;
+}
+
+function getHistoryDimensions(historyItem) {
+  const latentInputs = historyItem?.prompt?.[2]?.['57:13']?.inputs || {};
+  return {
+    width: Number(latentInputs.width) || 1600,
+    height: Number(latentInputs.height) || 900
+  };
+}
+
+function getHistoryTimestamp(historyItem, fallback) {
+  const messages = Array.isArray(historyItem?.status?.messages)
+    ? historyItem.status.messages
+    : [];
+  const match = [...messages].reverse().find(([type]) =>
+    type === 'execution_success' || type === 'execution_start'
+  );
+  return Number(match?.[1]?.timestamp) || fallback;
+}
+
+function generationFromHistory(historyItem, order) {
+  const imgInfo = findGeneratedImage(historyItem);
+  if (!imgInfo?.filename || !imgInfo.filename.startsWith('Infinite_')) return null;
+
+  const dimensions = getHistoryDimensions(historyItem);
+  return {
+    title: getHistoryPrompt(historyItem),
+    imgSrc: normalizeImageSrc(buildImageUrl(imgInfo)),
+    createdAt: getHistoryTimestamp(historyItem, Date.now() + order),
+    width: dimensions.width,
+    height: dimensions.height
+  };
+}
+
 /* ═══════════════════════════════════════
    ComfyUI Communication
    ═══════════════════════════════════════ */
@@ -1421,6 +1474,47 @@ async function refreshRemoteWork() {
     updatePlayState();
   } catch (err) {
     console.warn('[infini] queue check failed', err);
+  }
+}
+
+async function syncRemoteHistory() {
+  if (!COMFY_HOST || isHostedHereNow(location.hostname)) return;
+
+  try {
+    const res = await apiFetch('/history', { cache: 'no-store' }, 20000);
+    if (!res.ok) return;
+
+    const history = await res.json();
+    const remoteGenerations = Object.values(history)
+      .map(generationFromHistory)
+      .filter(Boolean)
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .slice(-160);
+
+    if (!remoteGenerations.length) return;
+
+    const existingSrcs = new Set(generations.map((gen) => normalizeImageSrc(gen.imgSrc)));
+    let didImport = false;
+
+    for (const generation of remoteGenerations) {
+      if (existingSrcs.has(generation.imgSrc)) continue;
+      generations.push(generation);
+      existingSrcs.add(generation.imgSrc);
+      didImport = true;
+    }
+
+    if (!didImport) return;
+
+    generations.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    save();
+
+    if (currentGenerationIndex < 0 || !$imageLayers.some((layer) => layer.getAttribute('src'))) {
+      selectGeneration(generations.length - 1, false);
+    }
+    renderCarousel();
+    updatePlayState();
+  } catch (err) {
+    console.warn('[infini] history sync failed', err);
   }
 }
 
@@ -1548,15 +1642,7 @@ async function generate(runId, promptText) {
 
       if (imgInfo) {
         if (runId !== generationRun || !isPlaying) return;
-          /* build image URL */
-        const { filename, subfolder, type } = imgInfo;
-        const params = new URLSearchParams({
-          filename,
-          type: type || 'output'
-            });
-        if (subfolder) params.set('subfolder', subfolder);
-        const url = `${COMFY_HOST}/view?${params}`;
-        onImageReady(url, dimensions);
+        onImageReady(buildImageUrl(imgInfo), dimensions);
         return;
          }
       attempts++;
@@ -1949,7 +2035,7 @@ function startNextGeneration() {
   generate(generationRun, currentRunPrompt);
 }
 
-function shouldLaunchFromTailnetOrigin() {
+function shouldUseTailnetOrigin() {
   if (!isHostedHereNow(location.hostname) || !COMFY_HOST) return false;
 
   try {
@@ -1960,12 +2046,17 @@ function shouldLaunchFromTailnetOrigin() {
   }
 }
 
-function buildTailnetLaunchUrl(promptText) {
+function buildTailnetLaunchUrl(promptText, options = {}) {
   const url = new URL(`${COMFY_HOST.replace(/\/+$/, '')}/`);
   const prompt = cleanPrompt(promptText);
   if (prompt) url.searchParams.set('prompt', prompt);
-  url.searchParams.set('start', '1');
+  if (options.start) url.searchParams.set('start', '1');
   return url.toString();
+}
+
+function redirectToTailnetApp(options = {}) {
+  const launchUrl = buildTailnetLaunchUrl(getPromptText(), options);
+  location.replace(launchUrl);
 }
 
 function launchTailnetApp(source = 'menu') {
@@ -1979,9 +2070,8 @@ function launchTailnetApp(source = 'menu') {
   startProgressFallback();
   updatePlayState();
 
-  const launchUrl = buildTailnetLaunchUrl(currentRunPrompt);
   setTimeout(() => {
-    location.assign(launchUrl);
+    redirectToTailnetApp({ start: true });
   }, 260);
 }
 
@@ -2004,7 +2094,7 @@ function startGeneration(source = 'menu') {
   if (isPlaying || isGenerating) return;
   if (!ensureComfyHost()) return;
 
-  if (shouldLaunchFromTailnetOrigin()) {
+  if (shouldUseTailnetOrigin()) {
     launchTailnetApp(source);
     return;
   }
@@ -2250,30 +2340,37 @@ function renderCarousel() {
 /* ═══════════════════════════════════════
    Init
    ═══════════════════════════════════════ */
-$promptInput.value = loadPrompt();
-currentRunPrompt = $promptInput.value || currentDemoPrompt;
-startPromptDemo();
-if (!shouldLaunchFromTailnetOrigin()) {
+function init() {
+  $promptInput.value = loadPrompt();
+  currentRunPrompt = $promptInput.value || currentDemoPrompt;
+
+  if (shouldUseTailnetOrigin()) {
+    redirectToTailnetApp({ start: URL_PARAMS.get('start') === '1' });
+    return;
+  }
+
+  startPromptDemo();
   smokeTestBridge();
   refreshRemoteWork();
-}
-finishSplash();
-load();
+  finishSplash();
+  load();
 
-if (generations.length > 0) {
-     /* Show last generation */
+  if (generations.length > 0) {
     selectGeneration(generations.length - 1, false);
     renderCarousel();
-} else {
-  $placeholder.textContent = '';
+  } else {
+    $placeholder.textContent = '';
+  }
+
+  updatePlayState();
+  syncRemoteHistory();
+
+  if (URL_PARAMS.get('start') === '1' && !isHostedHereNow(location.hostname)) {
+    setTimeout(() => startGeneration('splash'), 650);
+  }
 }
 
-updatePlayState();
-
-if (URL_PARAMS.get('start') === '1' && !isHostedHereNow(location.hostname)) {
-  setTimeout(() => startGeneration('splash'), 650);
-}
-
+init();
 
 </script>
 </body>
