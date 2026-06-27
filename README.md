@@ -74,9 +74,15 @@ launchctl remove com.samg.infini.bridge
 
 `reset` clears only the app's browser-side library cache. It does not delete ComfyUI output files.
 
+`stop` interrupts the active ComfyUI render and clears pending ComfyUI queue items, including work that was started before the page was reloaded.
+
 ## Screensaver
 
 The top-right arrow enters fullscreen screensaver mode. It shows the latest generated image and only fades to a new image when ComfyUI finishes the next one.
+
+## Audio
+
+The splash/start sounds are generated in the browser with Web Audio. iPhone requires a tap before sound can play, so audio starts from the splash/start gesture.
 
 ## Notes
 

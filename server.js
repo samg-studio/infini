@@ -8,7 +8,7 @@ const comfyHost = process.env.COMFY_HOST || 'http://127.0.0.1:8188';
 const root = __dirname;
 const basePath = normalizeBasePath(process.env.BASE_PATH || '');
 
-const proxyPrefixes = ['/prompt', '/history', '/view', '/interrupt', '/system_stats'];
+const proxyPrefixes = ['/prompt', '/history', '/view', '/interrupt', '/queue', '/system_stats'];
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
   .split(',')
   .map((origin) => origin.trim())
