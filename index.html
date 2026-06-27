@@ -977,7 +977,8 @@
 
       .prompt-dock {
         top: calc(env(safe-area-inset-top) + 18px);
-        width: min(44vw, 240px);
+        width: min(70vw, 360px);
+        max-width: calc(100vw - 132px);
       }
 
       .prompt-input {
@@ -1211,6 +1212,7 @@ const ESTIMATED_STEP_MS = 6500;
 const IMAGE_TRANSITION_MS = 3200;
 const SLOW_IMAGE_TRANSITION_MS = 4600;
 const PROMPT_DEMO_HOLD_MS = 3000;
+const AUDIO_MASTER_GAIN = 1.45;
 const PROMPT_EXAMPLES = [
   DEFAULT_PROMPT,
   `A short-haired hotel detective in a burgundy suit interviewing twin bellhops in a lemon lobby, centered close-up faces, ${PROMPT_FOUNDATION}`,
@@ -1478,11 +1480,10 @@ function loadPrompt() {
   try {
     const queryPrompt = getQueryPrompt();
     localStorage.removeItem(PROMPT_STORAGE_KEY);
-    if (queryPrompt && URL_PARAMS.get('auto') === '1') {
+    if (queryPrompt) {
       autoPromptSeed = queryPrompt;
       return '';
     }
-    if (queryPrompt) return queryPrompt;
   } catch {
   }
   return '';
@@ -2447,6 +2448,7 @@ function playWaveSound(kind = 'start') {
     snap: { duration: .16, peak: .08, filter: 2600, delay: .08, feedback: .035 }
   };
   const profile = profiles[kind] || profiles.start;
+  const peakGain = Math.min(.72, profile.peak * AUDIO_MASTER_GAIN);
   const now = ctx.currentTime + .025;
   const duration = profile.duration;
   const output = ctx.createGain();
@@ -2455,7 +2457,7 @@ function playWaveSound(kind = 'start') {
   const feedback = ctx.createGain();
 
   output.gain.setValueAtTime(0.0001, now);
-  output.gain.exponentialRampToValueAtTime(profile.peak, now + .12);
+  output.gain.exponentialRampToValueAtTime(peakGain, now + .12);
   output.gain.exponentialRampToValueAtTime(0.0001, now + duration + .55);
 
   filter.type = 'lowpass';
@@ -2977,7 +2979,7 @@ function launchTailnetApp(source = 'menu', promptText = getPromptText(), isAutoP
   updatePlayState();
 
   setTimeout(() => {
-    redirectToTailnetApp({ start: true, auto: isAutoPrompt, promptText });
+    redirectToTailnetApp({ start: true, auto: true, promptText });
   }, 260);
 }
 
