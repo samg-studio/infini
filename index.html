@@ -194,7 +194,7 @@
       font-weight: 400;
       line-height: 1.35;
       outline: none;
-      padding: 0 0 9px;
+      padding: 0 28px 9px 0;
       transition: border-color .25s ease, color .25s ease;
     }
 
@@ -215,6 +215,36 @@
     .prompt-input:read-only {
       cursor: default;
       opacity: .62;
+    }
+
+    .prompt-clear {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 22px;
+      height: 24px;
+      appearance: none;
+      background: none;
+      border: 0;
+      color: rgba(255,255,255,.78);
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1;
+      opacity: 0;
+      padding: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+
+    .prompt-dock.has-value .prompt-clear {
+      opacity: .6;
+      pointer-events: auto;
+    }
+
+    .prompt-dock.has-value .prompt-clear:hover {
+      opacity: 1;
     }
 
     .active-prompt {
@@ -361,38 +391,33 @@
       object-fit: cover;
       display: block;
       opacity: 0;
-      transform: scale(1.012);
-      transition: transform 24s ease-out;
+      transform: translateZ(0);
       z-index: 1;
       }
 
     .main-img.is-visible {
       opacity: 1;
-      transform: scale(1.035);
+      transform: translateZ(0);
       }
 
     .main-img.is-entering {
       opacity: 0;
       z-index: 3;
-      animation:
-        fadeNextIn 6.4s ease forwards,
-        kenBurnsIn 24s ease-out forwards;
+      animation: fadeNextIn 3.2s ease forwards;
       }
 
     .main-img.is-exiting {
       opacity: 1;
       z-index: 2;
-      animation: softRelease 6.4s ease forwards;
+      animation: softRelease 3.2s ease forwards;
       }
 
     .image-wrap.is-slow-transition .main-img.is-entering {
-      animation:
-        fadeNextInSlow 9.2s ease forwards,
-        kenBurnsIn 30s ease-out forwards;
+      animation: fadeNextInSlow 4.6s ease forwards;
     }
 
     .image-wrap.is-slow-transition .main-img.is-exiting {
-      animation: softReleaseSlow 9.2s ease forwards;
+      animation: softReleaseSlow 4.6s ease forwards;
     }
 
     .image-wrap.is-transitioning::after {
@@ -403,45 +428,38 @@
       opacity: 0;
       pointer-events: none;
       z-index: 4;
-      animation: fadeToBlack 6.4s ease-in-out forwards;
+      animation: fadeToBlack 3.2s ease-in-out forwards;
       }
 
     .image-wrap.is-slow-transition.is-transitioning::after {
-      animation: fadeToBlackSlow 9.2s ease-in-out forwards;
+      animation: fadeToBlackSlow 4.6s ease-in-out forwards;
     }
 
     @keyframes fadeNextIn {
-      0%, 48% {
+      0%, 34% {
         opacity: 0;
-        filter: blur(2px);
+        filter: blur(1.5px);
       }
-      72% {
+      76% {
         opacity: 1;
       }
       100% {
         opacity: 1;
         filter: blur(0);
       }
-    }
-
-    @keyframes kenBurnsIn {
-      0% { transform: scale(1.012); }
-      100% { transform: scale(1.052); }
     }
 
     @keyframes softRelease {
       0% {
         filter: blur(0);
         opacity: 1;
-        transform: scale(1.03);
       }
-      52% {
+      42% {
         opacity: 0;
       }
       100% {
-        filter: blur(4px);
+        filter: blur(2px);
         opacity: 0;
-        transform: scale(1.052);
       }
     }
 
@@ -449,7 +467,7 @@
       0%, 8% {
         opacity: 0;
       }
-      34%, 56% {
+      24%, 46% {
         opacity: 1;
       }
       100% {
@@ -458,11 +476,11 @@
     }
 
     @keyframes fadeNextInSlow {
-      0%, 56% {
+      0%, 42% {
         opacity: 0;
-        filter: blur(2px);
+        filter: blur(1.5px);
       }
-      82% {
+      78% {
         opacity: 1;
       }
       100% {
@@ -475,15 +493,13 @@
       0% {
         filter: blur(0);
         opacity: 1;
-        transform: scale(1.03);
       }
-      58% {
+      46% {
         opacity: 0;
       }
       100% {
-        filter: blur(4px);
+        filter: blur(2px);
         opacity: 0;
-        transform: scale(1.052);
       }
     }
 
@@ -491,7 +507,7 @@
       0%, 10% {
         opacity: 0;
       }
-      38%, 64% {
+      30%, 54% {
         opacity: 1;
       }
       100% {
@@ -517,7 +533,7 @@
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      gap: 12px;
+      gap: 0;
       opacity: 0;
       pointer-events: none;
       z-index: 710;
@@ -534,15 +550,11 @@
     }
 
     .generation-progress {
-      width: 112px;
-      opacity: 0;
-      transform: translateX(6px);
-      transition: opacity .45s ease, transform .45s ease;
+      display: none;
     }
 
     .spinner.has-progress .generation-progress {
-      opacity: 1;
-      transform: translateX(0);
+      display: none;
     }
 
     .progress-text {
@@ -596,7 +608,7 @@
     }
 
     .spinner.is-first .generation-progress {
-      width: 132px;
+      display: none;
     }
 
     @keyframes generationMarkFade {
@@ -914,33 +926,58 @@
     }
 
     body.fill-mode .main-img.is-visible {
-      animation: screenSaverKenBurns 38s ease-in-out infinite alternate;
+      animation: none;
+      transform: translateZ(0);
     }
 
     body.fill-mode .main-img.is-entering {
-      animation:
-        fadeNextIn 6.4s ease forwards,
-        screenSaverKenBurns 38s ease-in-out forwards;
+      animation: fadeNextIn 3.2s ease forwards;
     }
 
     body.fill-mode .image-wrap.is-slow-transition .main-img.is-entering {
-      animation:
-        fadeNextInSlow 9.2s ease forwards,
-        screenSaverKenBurns 46s ease-in-out forwards;
-    }
-
-    @keyframes screenSaverKenBurns {
-      0% {
-        transform: scale(1.015) translate3d(-.55%, -.35%, 0);
-      }
-      100% {
-        transform: scale(1.06) translate3d(.55%, .35%, 0);
-      }
+      animation: fadeNextInSlow 4.6s ease forwards;
     }
 
     body.fill-mode .fill-btn {
       opacity: 0;
       pointer-events: none;
+    }
+
+    .fill-exit {
+      position: fixed;
+      top: calc(env(safe-area-inset-top) + 18px);
+      right: calc(env(safe-area-inset-right) + 18px);
+      width: 36px;
+      height: 36px;
+      appearance: none;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 50%;
+      color: rgba(255,255,255,.88);
+      cursor: pointer;
+      display: grid;
+      font: inherit;
+      font-size: 18px;
+      font-weight: 500;
+      line-height: 1;
+      opacity: 0;
+      padding: 0 0 1px;
+      place-items: center;
+      pointer-events: none;
+      text-shadow: 0 2px 14px rgba(0,0,0,.7);
+      transition: opacity .35s ease, background .25s ease, border-color .25s ease;
+      z-index: 900;
+    }
+
+    body.fill-mode.is-fill-exit-visible .fill-exit {
+      opacity: .86;
+      pointer-events: auto;
+    }
+
+    body.fill-mode.is-fill-exit-visible .fill-exit:hover {
+      background: rgba(0,0,0,.32);
+      border-color: rgba(255,255,255,.3);
+      opacity: 1;
     }
 </style>
 </head>
@@ -960,11 +997,13 @@
          <button class="reset-btn" id="resetBtn" type="button">reset</button>
        </div>
      </div>
-     <div class="prompt-dock">
+     <div class="prompt-dock" id="promptDock">
        <input class="prompt-input" id="promptInput" type="text" autocomplete="off" spellcheck="false" aria-label="Prompt" />
+       <button class="prompt-clear" id="promptClear" type="button" aria-label="Clear prompt">x</button>
      </div>
      <button class="fill-btn" id="fillBtn" type="button" aria-label="Enter fullscreen"><span class="fill-icon" aria-hidden="true"></span></button>
 </div>
+<button class="fill-exit" id="fillExit" type="button" aria-label="Exit fullscreen">x</button>
 
 <!-- ── image area ── -->
 <div class="image-wrap" id="imageWrap">
@@ -1004,8 +1043,9 @@ const URL_PARAMS = new URLSearchParams(location.search);
 const KSAMPLER_NODE_ID = '57:3';
 const WORKFLOW_STEPS = 4;
 const ESTIMATED_STEP_MS = 6500;
-const IMAGE_TRANSITION_MS = 6500;
-const SLOW_IMAGE_TRANSITION_MS = 9200;
+const IMAGE_TRANSITION_MS = 3200;
+const SLOW_IMAGE_TRANSITION_MS = 4600;
+const PROMPT_DEMO_HOLD_MS = 3000;
 const PROMPT_EXAMPLES = [
   'Quantum Art 35mm Film',
   'Cinematic Kyoto rain garden, moss, lanterns, soft fog, 35mm film',
@@ -1682,7 +1722,10 @@ const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
 const $galleryBtn   = document.getElementById('galleryBtn');
 const $fillBtn      = document.getElementById('fillBtn');
+const $fillExit     = document.getElementById('fillExit');
+const $promptDock   = document.getElementById('promptDock');
 const $promptInput  = document.getElementById('promptInput');
+const $promptClear  = document.getElementById('promptClear');
 const $activePrompt = document.getElementById('activePrompt');
 const $splash       = document.getElementById('splash');
 const $carouselTrack = document.getElementById('carouselTrack');
@@ -1690,12 +1733,22 @@ const $carouselInner = document.getElementById('carouselInner');
 const $viewport     = document.getElementById('carouselViewport');
 let activeImageLayer = 0;
 let imageTransitionTimer = null;
+let fillExitTimer = null;
+let fillSwipeStartX = 0;
+let fillSwipeStartY = 0;
+let fillSwipePointerId = null;
 
 function getPromptText() {
   const typedPrompt = ($promptInput.value || '').trim();
   const prompt = typedPrompt || currentDemoPrompt || DEFAULT_PROMPT;
   savePrompt(typedPrompt);
   return prompt;
+}
+
+function updatePromptClearButton() {
+  const hasValue = Boolean(($promptInput.value || '').trim());
+  $promptDock.classList.toggle('has-value', hasValue);
+  $promptClear.disabled = $promptInput.readOnly || !hasValue;
 }
 
 function updatePromptDemoPlaceholder() {
@@ -1705,8 +1758,14 @@ function updatePromptDemoPlaceholder() {
   $promptInput.placeholder = typedExample;
 }
 
+function stopPromptDemo() {
+  if (!demoPromptTimer) return;
+  clearTimeout(demoPromptTimer);
+  demoPromptTimer = null;
+}
+
 function schedulePromptDemo(delay) {
-  if (demoPromptTimer) clearTimeout(demoPromptTimer);
+  stopPromptDemo();
   demoPromptTimer = setTimeout(advancePromptDemo, delay);
 }
 
@@ -1722,18 +1781,26 @@ function pickNextDemoPromptIndex() {
 
 function advancePromptDemo() {
   if (!PROMPT_EXAMPLES.length) return;
+  if (($promptInput.value || '').trim()) {
+    stopPromptDemo();
+    return;
+  }
 
   currentDemoPrompt = PROMPT_EXAMPLES[demoPromptIndex] || DEFAULT_PROMPT;
-  updatePromptDemoPlaceholder();
 
   if (demoCharIndex < currentDemoPrompt.length) {
     demoCharIndex++;
-    schedulePromptDemo(42 + Math.random() * 34);
+    updatePromptDemoPlaceholder();
+    schedulePromptDemo(
+      demoCharIndex >= currentDemoPrompt.length
+        ? PROMPT_DEMO_HOLD_MS
+        : 42 + Math.random() * 34
+    );
     return;
   }
 
   $promptInput.classList.add('is-demo-fading');
-  if (demoPromptTimer) clearTimeout(demoPromptTimer);
+  stopPromptDemo();
   demoPromptTimer = setTimeout(() => {
     demoPromptIndex = pickNextDemoPromptIndex();
     currentDemoPrompt = PROMPT_EXAMPLES[demoPromptIndex] || DEFAULT_PROMPT;
@@ -1745,11 +1812,18 @@ function advancePromptDemo() {
 }
 
 function startPromptDemo() {
+  stopPromptDemo();
+  $promptInput.classList.remove('is-demo-fading');
+  if (($promptInput.value || '').trim()) {
+    $promptInput.placeholder = '';
+    return;
+  }
+
   demoPromptIndex = Math.floor(Math.random() * PROMPT_EXAMPLES.length);
   currentDemoPrompt = PROMPT_EXAMPLES[demoPromptIndex] || DEFAULT_PROMPT;
-  demoCharIndex = Math.max(1, demoCharIndex);
-  updatePromptDemoPlaceholder();
-  schedulePromptDemo(70);
+  demoCharIndex = 0;
+  $promptInput.placeholder = '';
+  schedulePromptDemo(220);
 }
 
 function getAudioContext() {
@@ -2009,6 +2083,7 @@ function updatePlayState() {
   $fillBtn.setAttribute('aria-pressed', String(isFillMode));
   $fillBtn.setAttribute('aria-label', isFillMode ? 'Exit fullscreen' : 'Enter fullscreen');
   $promptInput.readOnly = isRunning;
+  updatePromptClearButton();
   const selectedGeneration = generations[currentGenerationIndex];
   const activePromptTitle = isRunning ? currentRunPrompt : (selectedGeneration?.title || '');
   document.body.classList.toggle('has-active-prompt', Boolean(activePromptTitle));
@@ -2153,7 +2228,18 @@ $splash.addEventListener('click', () => startGeneration('splash'));
 $resetBtn.addEventListener('click', resetLibrary);
 
 $promptInput.addEventListener('input', () => {
-  if (!($promptInput.value || '').trim()) updatePromptDemoPlaceholder();
+  const hasValue = Boolean(($promptInput.value || '').trim());
+  updatePromptClearButton();
+
+  if (hasValue) {
+    stopPromptDemo();
+    $promptInput.placeholder = '';
+    $promptInput.classList.remove('is-demo-fading');
+    return;
+  }
+
+  savePrompt('');
+  startPromptDemo();
 });
 $promptInput.addEventListener('change', () => savePrompt($promptInput.value));
 $promptInput.addEventListener('keydown', (e) => {
@@ -2162,6 +2248,16 @@ $promptInput.addEventListener('keydown', (e) => {
     $promptInput.blur();
     if (!isPlaying && !isGenerating) $playBtn.click();
   }
+});
+
+$promptClear.addEventListener('click', () => {
+  if ($promptClear.disabled) return;
+
+  $promptInput.value = '';
+  savePrompt('');
+  updatePromptClearButton();
+  startPromptDemo();
+  $promptInput.focus();
 });
 
 function setGalleryVisible(isVisible) {
@@ -2174,12 +2270,55 @@ function showLatestInFillMode() {
   selectGeneration(generations.length - 1, false);
 }
 
+function hideFillExitControl() {
+  if (fillExitTimer) {
+    clearTimeout(fillExitTimer);
+    fillExitTimer = null;
+  }
+  document.body.classList.remove('is-fill-exit-visible');
+}
+
+function showFillExitControl(duration = 3600) {
+  if (!isFillMode) return;
+
+  document.body.classList.add('is-fill-exit-visible');
+  if (fillExitTimer) clearTimeout(fillExitTimer);
+  fillExitTimer = setTimeout(hideFillExitControl, duration);
+}
+
+function isInteractiveTarget(target) {
+  return Boolean(target?.closest?.('button, input, a'));
+}
+
+function startFillSwipe(e) {
+  if (!isFillMode || isInteractiveTarget(e.target)) return;
+
+  fillSwipePointerId = e.pointerId;
+  fillSwipeStartX = e.clientX;
+  fillSwipeStartY = e.clientY;
+  showFillExitControl();
+}
+
+function finishFillSwipe(e) {
+  if (!isFillMode || fillSwipePointerId !== e.pointerId) return;
+
+  const deltaX = e.clientX - fillSwipeStartX;
+  const deltaY = e.clientY - fillSwipeStartY;
+  fillSwipePointerId = null;
+
+  if (!canKeyboardCycleGallery()) return;
+  if (Math.abs(deltaX) < 52 || Math.abs(deltaX) < Math.abs(deltaY) * 1.35) return;
+
+  cycleGalleryByKeyboard(deltaX < 0 ? 1 : -1);
+}
+
 async function enterFillMode() {
   isFillMode = true;
   document.body.classList.add('fill-mode');
   if (document.activeElement === $promptInput) $promptInput.blur();
   showLatestInFillMode();
   updatePlayState();
+  showFillExitControl(1800);
 
   try {
     if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
@@ -2191,6 +2330,7 @@ async function enterFillMode() {
 async function exitFillMode() {
   isFillMode = false;
   document.body.classList.remove('fill-mode');
+  hideFillExitControl();
   updatePlayState();
 
   try {
@@ -2212,13 +2352,31 @@ $fillBtn.addEventListener('click', () => {
   }
 });
 
+$fillExit.addEventListener('click', (e) => {
+  e.stopPropagation();
+  exitFillMode();
+});
+
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement && isFillMode) {
     isFillMode = false;
     document.body.classList.remove('fill-mode');
+    hideFillExitControl();
     updatePlayState();
   }
 });
+
+document.addEventListener('pointerdown', (e) => {
+  startFillSwipe(e);
+}, { passive: true });
+
+document.addEventListener('pointerup', (e) => {
+  finishFillSwipe(e);
+}, { passive: true });
+
+document.addEventListener('pointercancel', () => {
+  fillSwipePointerId = null;
+}, { passive: true });
 
 function canKeyboardCycleGallery() {
   return isFillMode &&
