@@ -187,7 +187,7 @@
     }
 
     .reset-btn {
-      margin-top: 20px;
+      margin-top: 28px;
       }
 
     .prompt-dock {
@@ -199,18 +199,29 @@
       transition: opacity .35s ease;
       }
 
-    .prompt-dock.is-truncated::after {
-      content: '…';
-      position: absolute;
-      right: 22px;
-      bottom: 0;
+    .prompt-preview {
+      width: 100%;
+      min-height: 4.05em;
+      appearance: none;
+      background: transparent;
+      border: 0;
       color: rgba(255,255,255,.92);
+      cursor: text;
+      display: -webkit-box;
       font: inherit;
       font-size: 18px;
       font-weight: 400;
       line-height: 1.35;
-      pointer-events: none;
+      overflow: hidden;
+      padding: 0 44px 0 0;
+      text-align: left;
       text-shadow: 0 2px 18px rgba(0,0,0,.58);
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+    }
+
+    .prompt-preview:empty {
+      min-height: 4.05em;
     }
 
     .prompt-input {
@@ -224,16 +235,20 @@
       font: inherit;
       font-size: 18px;
       font-weight: 400;
-      line-height: 1.35;
-      min-height: 83px;
-      max-height: 112px;
+      line-height: 1.42;
+      min-height: 4.26em;
+      max-height: 4.26em;
       outline: none;
       overflow-y: hidden;
-      padding: 0 22px 0 0;
+      padding: 0 44px 0 0;
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
       resize: none;
       scrollbar-width: none;
       text-align: left;
-      transition: color .25s ease, text-shadow .25s ease;
+      transition: color .25s ease, opacity .2s ease, text-shadow .25s ease;
       white-space: pre-wrap;
     }
 
@@ -242,18 +257,19 @@
       text-shadow: none;
     }
 
-    .prompt-dock.is-truncated .prompt-input {
-      padding-right: 44px;
-    }
-
     body.is-prompt-focused .prompt-input {
       font-size: 22px;
-      min-height: 132px;
-      max-height: min(42dvh, 360px);
+      line-height: 1.45;
+      min-height: 144px;
+      max-height: min(46dvh, 380px);
       overflow-y: auto;
+      padding: 0 44px 14px 0;
+      position: relative;
+      opacity: 1;
+      pointer-events: auto;
     }
 
-    body.is-prompt-focused .prompt-dock::after {
+    body.is-prompt-focused .prompt-preview {
       display: none;
     }
 
@@ -1051,13 +1067,13 @@
       }
 
       .title-stack {
-        width: calc(100% - 44px);
+        width: calc(100% - 34px);
         gap: 12px;
       }
 
       .interface-grid {
-        grid-template-columns: 72px minmax(0, 1fr) auto;
-        column-gap: 14px;
+        grid-template-columns: 64px minmax(0, 1fr) auto;
+        column-gap: 10px;
       }
 
       .brand {
@@ -1076,26 +1092,28 @@
         z-index: 620;
       }
 
+      .prompt-preview,
       .prompt-input {
         font-size: 16px;
-        min-height: 83px;
-        max-height: 108px;
-        padding-right: 22px;
         text-shadow: 0 2px 14px rgba(0,0,0,.68);
       }
 
-      .prompt-dock.is-truncated .prompt-input {
-        padding-right: 44px;
+      .prompt-preview {
+        min-height: 4.05em;
       }
 
-      .prompt-dock.is-truncated::after {
-        font-size: 16px;
+      .prompt-input {
+        min-height: 4.26em;
+        max-height: 4.26em;
+        padding-right: 44px;
       }
 
       body.is-prompt-focused .prompt-input {
         font-size: 21px;
-        min-height: 132px;
-        max-height: min(38dvh, 300px);
+        line-height: 1.45;
+        min-height: 144px;
+        max-height: min(42dvh, 340px);
+        padding-bottom: 14px;
       }
 
       .active-prompt {
@@ -1265,6 +1283,7 @@
            <button class="reset-btn" id="resetBtn" type="button">reset</button>
          </div>
          <div class="prompt-dock" id="promptDock">
+           <button class="prompt-preview" id="promptPreview" type="button" aria-label="Edit prompt"></button>
            <textarea class="prompt-input" id="promptInput" rows="2" autocomplete="off" spellcheck="false" aria-label="Prompt"></textarea>
            <button class="prompt-clear" id="promptClear" type="button" aria-label="Clear prompt">x</button>
          </div>
@@ -2370,6 +2389,7 @@ const $downloadBtn  = document.getElementById('downloadBtn');
 const $deleteBtn    = document.getElementById('deleteBtn');
 const $fillBtn      = document.getElementById('fillBtn');
 const $promptDock   = document.getElementById('promptDock');
+const $promptPreview = document.getElementById('promptPreview');
 const $promptInput  = document.getElementById('promptInput');
 const $promptClear  = document.getElementById('promptClear');
 const $activePrompt = document.getElementById('activePrompt');
@@ -2412,11 +2432,12 @@ function getPromptDisplayText() {
 }
 
 function updatePromptDisplayState() {
-  if (!$promptInput || !$promptDock) return;
+  if (!$promptInput || !$promptDock || !$promptPreview) return;
 
   const text = getPromptDisplayText();
   const isFocused = document.activeElement === $promptInput;
-  const isOverflowing = $promptInput.scrollHeight > $promptInput.clientHeight + 2;
+  $promptPreview.textContent = text;
+  const isOverflowing = $promptPreview.scrollHeight > $promptPreview.clientHeight + 2;
   const isLikelyLong = text.length > 72;
   $promptDock.classList.toggle('has-display-text', Boolean(text));
   $promptDock.classList.toggle('is-truncated', Boolean(text) && !isFocused && (isOverflowing || isLikelyLong));
@@ -3260,6 +3281,11 @@ $promptInput.addEventListener('keydown', (e) => {
     $promptInput.blur();
     if (!isPlaying && !isGenerating) $playBtn.click();
   }
+});
+
+$promptPreview.addEventListener('click', () => {
+  if ($promptInput.readOnly) return;
+  $promptInput.focus();
 });
 
 $promptClear.addEventListener('click', () => {
