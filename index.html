@@ -300,6 +300,7 @@
     .play-btn,
     .reset-btn,
     .gallery-btn,
+    .grid-btn,
     .download-btn,
     .delete-btn,
     .fill-btn {
@@ -325,6 +326,8 @@
     .reset-btn:hover,
     .gallery-btn:hover,
     .gallery-btn.is-active,
+    .grid-btn:hover,
+    .grid-btn.is-active,
     .download-btn:hover,
     .download-btn.is-active,
     .delete-btn:hover,
@@ -1132,6 +1135,7 @@
        <div class="top-controls">
          <button class="play-btn" id="playBtn" type="button">start</button>
          <button class="gallery-btn is-active" id="galleryBtn" type="button">gallery</button>
+         <button class="grid-btn" id="gridBtn" type="button">grid</button>
          <button class="download-btn" id="downloadBtn" type="button">download</button>
          <button class="delete-btn" id="deleteBtn" type="button">delete</button>
          <button class="reset-btn" id="resetBtn" type="button">reset</button>
@@ -1180,8 +1184,7 @@
 /* ═══════════════════════════════════════
    State & Config
    ═══════════════════════════════════════ */
-const DEFAULT_PROMPT = 'Quantum Art 35mm Film';
-const PREVIOUS_DEFAULT_PROMPT = 'Quantum art';
+const DEFAULT_PROMPT = 'Advertising quality symmetrical 35mm film portrait, short-haired woman in a teal suit looking bored in a mustard kitchen, close-up face, soft grain';
 const API_STORAGE_KEY = 'infini_api_base';
 const PROMPT_STORAGE_KEY = 'infini_prompt';
 const CLIENT_ID_STORAGE_KEY = 'infini_client_id';
@@ -1194,7 +1197,7 @@ const IMAGE_TRANSITION_MS = 3200;
 const SLOW_IMAGE_TRANSITION_MS = 4600;
 const PROMPT_DEMO_HOLD_MS = 3000;
 const PROMPT_EXAMPLES = [
-  'Advertising quality symmetrical 35mm film portrait, short-haired woman in a teal suit looking bored in a mustard kitchen, close-up face, soft grain',
+  DEFAULT_PROMPT,
   'Deadpan luxury campaign, woman with blunt black bob in a crimson suit at a mint breakfast table, centered face close-up, precise pastel symmetry, 35mm film grain',
   'Symmetrical editorial kitchen scene, bored woman in powder blue tailoring holding a tiny espresso, close to face, lemon yellow cabinets, cinematic 35mm grain',
   'Advertising quality close-up, short-haired woman in a white suit staring past camera in a cherry red kitchen, centered composition, clean color blocking, film grain',
@@ -1219,6 +1222,48 @@ const PROMPT_EXAMPLES = [
   'High-end magazine ad, two people in monochrome suits separated by a yellow kitchen table, both expressionless, close-up, precise centered composition',
   'Bored woman with short hair in a royal blue suit, close to face in a spotless cream kitchen, red lipstick, symmetrical advertising still, film grain'
 ];
+const SUIT_COLORS = [
+  'teal', 'crimson', 'powder blue', 'ivory', 'emerald', 'violet',
+  'charcoal', 'butter yellow', 'cobalt', 'rose', 'forest green',
+  'tangerine', 'burgundy', 'slate', 'chocolate', 'white linen'
+];
+const SUIT_STYLES = [
+  'boxy double-breasted tailoring', 'sharp narrow lapels', 'oversized 1980s shoulders',
+  'silk evening tailoring', 'cropped modern jacket', 'wide-leg pleated trousers',
+  'minimal wool suit', 'velvet dinner suit', 'pinstripe office suit',
+  'high-waisted skirt suit', 'linen summer suit', 'monochrome formal suit'
+];
+const HAIR_DETAILS = [
+  'short copper hair', 'blunt black bob', 'silver pixie cut', 'slick blonde crop',
+  'dark auburn waves tucked behind one ear', 'platinum bowl cut', 'jet black short curls',
+  'chestnut fringe', 'icy blue-black bob', 'soft brown cropped hair'
+];
+const SCENE_DETAILS = [
+  'mustard kitchen with chrome handles', 'mint tiled breakfast nook',
+  'pistachio kitchen with oranges on the counter', 'tomato red galley kitchen',
+  'powder blue cabinets and a tiny espresso cup', 'pink tiled kitchen with red flowers',
+  'cream kitchen with one untouched pie', 'seafoam cabinets and a silver refrigerator',
+  'lemon yellow kitchen island', 'avocado walls and glossy black counters'
+];
+const CHARACTER_PROPS = [
+  'holding a tiny espresso', 'beside an untouched pie', 'with one red saucepan',
+  'next to a single birthday candle', 'wearing pearl earrings', 'holding white gloves',
+  'with a crystal glass of water', 'beside a bowl of oranges',
+  'with a folded newspaper', 'next to a chrome toaster'
+];
+const FILM_DETAILS = [
+  'soft 35mm grain', 'Kodak-style color warmth', 'subtle halation on highlights',
+  'clean advertising light', 'matte editorial color', 'precise centered symmetry',
+  'deadpan close-up framing', 'gentle lens softness', 'balanced pastel color blocking',
+  'quiet luxury campaign finish'
+];
+const GENERAL_VARIATIONS = [
+  'change the palette, materials, and light while preserving the exact subject and composition',
+  'shift the time of day, texture, and atmosphere while keeping the same scene bones',
+  'vary the styling, props, and color world without changing the core subject',
+  'keep the same framing and mood, but alter surfaces, weather, and small objects',
+  'preserve the same central idea, with a new color palette and production design'
+];
 let COMFY_HOST = getComfyHost();
 const CLIENT_ID = getClientId();
 let generations = [];          // { title, imgSrc, imageInfo, key, createdAt }
@@ -1226,6 +1271,7 @@ let deletedImageKeys = new Set();
 let isGenerating = false;
 let isPlaying = false;
 let isGalleryVisible = true;
+let isBrowseGridMode = false;
 let isDeleteMode = false;
 let isDownloadMode = false;
 let isFillMode = false;
@@ -1234,6 +1280,9 @@ let generationRun = 0;
 let activePromptId = null;
 let latestPopIndex = -1;
 let currentRunPrompt = DEFAULT_PROMPT;
+let runBasePrompt = DEFAULT_PROMPT;
+let runVariationIndex = 0;
+let autoPromptSeed = '';
 let currentRunDimensions = { width: 1200, height: 675 };
 let hasRemoteWork = false;
 let audioContext = null;
@@ -1267,6 +1316,62 @@ function cleanPrompt(value) {
   return (value || '').trim() || DEFAULT_PROMPT;
 }
 
+function getTypedPrompt() {
+  return ($promptInput?.value || '').trim();
+}
+
+function pickDetail(list, index, salt) {
+  if (!list.length) return '';
+  return list[(index * 7 + salt * 11 + Math.floor(Math.random() * list.length)) % list.length];
+}
+
+function isCharacterScenePrompt(prompt) {
+  return /suit|woman|man|person|people|portrait|face|hair|kitchen|couple|character/i.test(prompt);
+}
+
+function buildPromptVariation(basePrompt, index = 0) {
+  const base = cleanPrompt(basePrompt);
+
+  if (!isCharacterScenePrompt(base)) {
+    return [
+      base,
+      `Keep the same core subject, composition, and mood.`,
+      `Infinite variation ${index + 1}: ${pickDetail(GENERAL_VARIATIONS, index, 1)}, ${pickDetail(FILM_DETAILS, index, 2)}.`
+    ].join(' ');
+  }
+
+  const details = [
+    `${pickDetail(SUIT_COLORS, index, 1)} ${pickDetail(SUIT_STYLES, index, 2)}`,
+    pickDetail(HAIR_DETAILS, index, 3),
+    pickDetail(SCENE_DETAILS, index, 4),
+    pickDetail(CHARACTER_PROPS, index, 5),
+    pickDetail(FILM_DETAILS, index, 6)
+  ].filter(Boolean);
+
+  return [
+    base,
+    `Keep the same core subject, close-up framing, deadpan mood, and scene bones.`,
+    `Infinite variation ${index + 1}: change details to ${details.join(', ')}.`
+  ].join(' ');
+}
+
+function getSeedPrompt() {
+  const typedPrompt = getTypedPrompt();
+  return cleanPrompt(typedPrompt || autoPromptSeed || currentDemoPrompt || DEFAULT_PROMPT);
+}
+
+function beginPromptRun() {
+  runBasePrompt = getSeedPrompt();
+  runVariationIndex = 0;
+  currentRunPrompt = runBasePrompt;
+  if (!getTypedPrompt()) autoPromptSeed = '';
+}
+
+function nextPromptVariation() {
+  currentRunPrompt = buildPromptVariation(runBasePrompt, runVariationIndex++);
+  return currentRunPrompt;
+}
+
 function getQueryPrompt() {
   return (URL_PARAMS.get('prompt') || '').trim();
 }
@@ -1275,6 +1380,10 @@ function loadPrompt() {
   try {
     const queryPrompt = getQueryPrompt();
     localStorage.removeItem(PROMPT_STORAGE_KEY);
+    if (queryPrompt && URL_PARAMS.get('auto') === '1') {
+      autoPromptSeed = queryPrompt;
+      return '';
+    }
     if (queryPrompt) return queryPrompt;
   } catch {
   }
@@ -2043,6 +2152,7 @@ const $progressFill = document.getElementById('progressFill');
 const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
 const $galleryBtn   = document.getElementById('galleryBtn');
+const $gridBtn      = document.getElementById('gridBtn');
 const $downloadBtn  = document.getElementById('downloadBtn');
 const $deleteBtn    = document.getElementById('deleteBtn');
 const $fillBtn      = document.getElementById('fillBtn');
@@ -2066,10 +2176,8 @@ let fillSwipeStartY = 0;
 let fillSwipePointerId = null;
 
 function getPromptText() {
-  const typedPrompt = ($promptInput.value || '').trim();
-  const prompt = typedPrompt || currentDemoPrompt || DEFAULT_PROMPT;
-  savePrompt(typedPrompt);
-  return prompt;
+  savePrompt(getTypedPrompt());
+  return getSeedPrompt();
 }
 
 function updatePromptClearButton() {
@@ -2371,10 +2479,11 @@ function removeGenerationsByKeys(keys) {
 }
 
 function isGridPanelOpen() {
-  return isDeleteMode || isDownloadMode;
+  return isBrowseGridMode || isDeleteMode || isDownloadMode;
 }
 
 function setGridMode(mode) {
+  isBrowseGridMode = mode === 'grid';
   isDeleteMode = mode === 'delete';
   isDownloadMode = mode === 'download';
   document.body.classList.toggle('delete-mode', isGridPanelOpen());
@@ -2399,16 +2508,23 @@ function setDownloadMode(isActive) {
   setGridMode(isActive ? 'download' : '');
 }
 
+function setBrowseGridMode(isActive) {
+  setGridMode(isActive ? 'grid' : '');
+}
+
 function renderGridPanel() {
   $deleteGrid.innerHTML = '';
 
-  const panelGenerations = generations.filter((gen) => gen.imageInfo?.filename && gen.key);
-  const actionWord = isDownloadMode ? 'download' : 'delete';
+  const panelItems = generations
+    .map((gen, index) => ({ gen, index }))
+    .filter(({ gen }) => gen.imgSrc && gen.key && (isBrowseGridMode || gen.imageInfo?.filename));
+  const actionWord = isDownloadMode ? 'download' : (isDeleteMode ? 'delete' : 'view');
+  const currentKey = generations[currentGenerationIndex]?.key;
 
-  if (!panelGenerations.length) {
+  if (!panelItems.length) {
     const empty = document.createElement('div');
     empty.className = 'delete-empty';
-    empty.textContent = `nothing to ${actionWord}`;
+    empty.textContent = isBrowseGridMode ? 'nothing to view' : `nothing to ${actionWord}`;
     $deleteGrid.appendChild(empty);
     $deleteConfirm.disabled = false;
     $deleteConfirm.textContent = 'done';
@@ -2416,12 +2532,15 @@ function renderGridPanel() {
     return;
   }
 
-  for (const gen of panelGenerations) {
+  for (const { gen, index } of panelItems) {
+    const isSelected = isBrowseGridMode
+      ? gen.key === currentKey
+      : selectedGridKeys.has(gen.key);
     const thumb = document.createElement('button');
-    thumb.className = `delete-thumb${selectedGridKeys.has(gen.key) ? ' is-selected' : ''}`;
+    thumb.className = `delete-thumb${isSelected ? ' is-selected' : ''}`;
     thumb.type = 'button';
     thumb.setAttribute('aria-label', gen.title || `${actionWord} image`);
-    thumb.setAttribute('aria-pressed', String(selectedGridKeys.has(gen.key)));
+    thumb.setAttribute('aria-pressed', String(isSelected));
 
     const img = document.createElement('img');
     img.src = normalizeImageSrc(gen.imgSrc);
@@ -2430,6 +2549,12 @@ function renderGridPanel() {
     thumb.appendChild(img);
 
     thumb.addEventListener('click', () => {
+      if (isBrowseGridMode) {
+        selectGeneration(index, true, false, { playSnap: index !== currentGenerationIndex });
+        setGridMode('');
+        return;
+      }
+
       if (selectedGridKeys.has(gen.key)) {
         selectedGridKeys.delete(gen.key);
       } else {
@@ -2439,6 +2564,13 @@ function renderGridPanel() {
     });
 
     $deleteGrid.appendChild(thumb);
+  }
+
+  if (isBrowseGridMode) {
+    $deleteConfirm.disabled = false;
+    $deleteConfirm.textContent = 'done';
+    $deleteCancel.hidden = true;
+    return;
   }
 
   const hasSelection = selectedGridKeys.size > 0;
@@ -2661,6 +2793,8 @@ function updatePlayState() {
   $playBtn.setAttribute('aria-label', isRunning ? 'Stop generation' : 'Start generation');
   $galleryBtn.classList.toggle('is-active', isGalleryVisible);
   $galleryBtn.setAttribute('aria-pressed', String(isGalleryVisible));
+  $gridBtn.classList.toggle('is-active', isBrowseGridMode);
+  $gridBtn.setAttribute('aria-pressed', String(isBrowseGridMode));
   $downloadBtn.classList.toggle('is-active', isDownloadMode);
   $downloadBtn.setAttribute('aria-pressed', String(isDownloadMode));
   $deleteBtn.classList.toggle('is-active', isDeleteMode);
@@ -2689,6 +2823,7 @@ function updateGalleryVisibility() {
 function startNextGeneration() {
   if (!isPlaying || isGenerating) return;
 
+  nextPromptVariation();
   isGenerating = true;
   resetGenerationProgress();
   startProgressFallback();
@@ -2711,18 +2846,19 @@ function buildTailnetLaunchUrl(promptText, options = {}) {
   const url = new URL(`${COMFY_HOST.replace(/\/+$/, '')}/`);
   const prompt = cleanPrompt(promptText);
   if (prompt) url.searchParams.set('prompt', prompt);
+  if (options.auto) url.searchParams.set('auto', '1');
   if (options.start) url.searchParams.set('start', '1');
   return url.toString();
 }
 
 function redirectToTailnetApp(options = {}) {
-  const launchUrl = buildTailnetLaunchUrl(getPromptText(), options);
+  const launchUrl = buildTailnetLaunchUrl(options.promptText || getPromptText(), options);
   location.replace(launchUrl);
 }
 
-function launchTailnetApp(source = 'menu') {
+function launchTailnetApp(source = 'menu', promptText = getPromptText(), isAutoPrompt = false) {
   playWaveSound(source === 'splash' ? 'splash' : 'start');
-  currentRunPrompt = getPromptText();
+  currentRunPrompt = promptText;
   isPlaying = true;
   isGenerating = true;
   hasRemoteWork = false;
@@ -2732,7 +2868,7 @@ function launchTailnetApp(source = 'menu') {
   updatePlayState();
 
   setTimeout(() => {
-    redirectToTailnetApp({ start: true });
+    redirectToTailnetApp({ start: true, auto: isAutoPrompt, promptText });
   }, 260);
 }
 
@@ -2755,16 +2891,18 @@ function startGeneration(source = 'menu') {
   if (isPlaying || isGenerating) return;
   if (!ensureComfyHost()) return;
   if (isGridPanelOpen()) setGridMode('');
+  const typedPrompt = getTypedPrompt();
+  const seedPrompt = getSeedPrompt();
 
   if (shouldUseTailnetOrigin()) {
-    launchTailnetApp(source);
+    launchTailnetApp(source, seedPrompt, !typedPrompt);
     return;
   }
 
   playWaveSound(source === 'splash' ? 'splash' : 'start');
 
   generationRun++;
-  currentRunPrompt = getPromptText();
+  beginPromptRun();
   hasRemoteWork = false;
   isPlaying = true;
   hideSplash();
@@ -2779,6 +2917,7 @@ function resetLibrary() {
   isGenerating = false;
   hasRemoteWork = false;
   isGalleryVisible = true;
+  isBrowseGridMode = false;
   isDeleteMode = false;
   isDownloadMode = false;
   document.body.classList.remove('delete-mode');
@@ -2938,6 +3077,10 @@ async function exitFillMode() {
 
 $galleryBtn.addEventListener('click', () => {
   setGalleryVisible(!isGalleryVisible);
+});
+
+$gridBtn.addEventListener('click', () => {
+  setBrowseGridMode(!isBrowseGridMode);
 });
 
 $downloadBtn.addEventListener('click', () => {
@@ -3113,7 +3256,7 @@ function renderCarousel() {
    ═══════════════════════════════════════ */
 async function init() {
   $promptInput.value = loadPrompt();
-  currentRunPrompt = $promptInput.value || currentDemoPrompt;
+  currentRunPrompt = $promptInput.value || autoPromptSeed || currentDemoPrompt || DEFAULT_PROMPT;
 
   if (shouldUseTailnetOrigin()) {
     redirectToTailnetApp({ start: URL_PARAMS.get('start') === '1' });
