@@ -14,6 +14,8 @@
     }
 
     body {
+      --art-aspect: 16 / 9;
+      --art-ratio: 1.777777778;
       background: #000;
       color: #fff;
       font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -24,6 +26,11 @@
       overflow-x: hidden;
       padding-bottom: 96px;
       }
+
+    body.art-portrait {
+      --art-aspect: 9 / 16;
+      --art-ratio: .5625;
+    }
 
     body::before {
       content: '';
@@ -325,7 +332,7 @@
     .image-wrap {
       width: calc(100% - clamp(24px, 4vw, 64px));
       max-width: 1280px;
-      aspect-ratio: 16 / 9;
+      aspect-ratio: var(--art-aspect);
       margin-top: clamp(46px, 6vh, 90px);
       border-radius: 10px;
       overflow: hidden;
@@ -439,8 +446,10 @@
       position: fixed;
       right: 28px;
       bottom: calc(env(safe-area-inset-bottom) + 36px);
-      display: grid;
-      place-items: center;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
       opacity: 0;
       pointer-events: none;
       z-index: 710;
@@ -454,6 +463,49 @@
       top: 50%;
       bottom: auto;
       transform: translate(-50%, -50%);
+    }
+
+    .generation-progress {
+      width: 112px;
+      opacity: 0;
+      transform: translateX(6px);
+      transition: opacity .45s ease, transform .45s ease;
+    }
+
+    .spinner.has-progress .generation-progress {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .progress-text {
+      color: rgba(255,255,255,.68);
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .2px;
+      line-height: 1;
+      text-align: right;
+      text-shadow: 0 2px 16px rgba(0,0,0,.66);
+      white-space: nowrap;
+    }
+
+    .progress-bar {
+      display: block;
+      height: 2px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255,255,255,.18);
+      box-shadow: 0 0 18px rgba(255,255,255,.08);
+    }
+
+    .progress-fill {
+      display: block;
+      width: var(--progress, 0%);
+      height: 100%;
+      border-radius: inherit;
+      background: rgba(255,255,255,.82);
+      transition: width .72s cubic-bezier(.22,.75,.25,1);
     }
 
     .generation-mark {
@@ -473,6 +525,10 @@
       text-shadow:
         0 0 26px rgba(255,255,255,.2),
         0 8px 34px rgba(0,0,0,.72);
+    }
+
+    .spinner.is-first .generation-progress {
+      width: 132px;
     }
 
     @keyframes generationMarkFade {
@@ -727,11 +783,14 @@
         position: fixed;
         left: 50%;
         top: 50%;
-        width: calc(100vw - 36px);
+        width: min(
+          calc(100vw - 36px),
+          calc((100dvh - 300px) * var(--art-ratio))
+        );
         height: auto;
         margin-top: 0;
         max-width: none;
-        aspect-ratio: 16 / 9;
+        aspect-ratio: var(--art-aspect);
         border-radius: 8px;
         transform: translate(-50%, -50%);
         z-index: 0;
@@ -768,12 +827,12 @@
       bottom: auto;
       width: min(
         calc(100vw - (var(--screen-pad) * 2)),
-        calc((100dvh - (var(--screen-pad) * 2)) * 16 / 9)
+        calc((100dvh - (var(--screen-pad) * 2)) * var(--art-ratio))
       );
       height: auto;
       max-width: none;
       margin-top: 0;
-      aspect-ratio: 16 / 9;
+      aspect-ratio: var(--art-aspect);
       border-radius: 10px;
       background: #000;
       box-shadow: 0 18px 60px rgba(0,0,0,.42);
@@ -784,6 +843,25 @@
     body.fill-mode .main-img {
       object-fit: contain;
       object-position: center center;
+    }
+
+    body.fill-mode .main-img.is-visible {
+      animation: screenSaverKenBurns 38s ease-in-out infinite alternate;
+    }
+
+    body.fill-mode .main-img.is-entering {
+      animation:
+        fadeNextIn 6.4s ease forwards,
+        screenSaverKenBurns 38s ease-in-out forwards;
+    }
+
+    @keyframes screenSaverKenBurns {
+      0% {
+        transform: scale(1.015) translate3d(-.55%, -.35%, 0);
+      }
+      100% {
+        transform: scale(1.06) translate3d(.55%, .35%, 0);
+      }
     }
 
     body.fill-mode .fill-btn {
@@ -830,6 +908,10 @@
 
 <div class="active-prompt" id="activePrompt"></div>
 <div class="spinner" id="spinner">
+     <span class="generation-progress" aria-live="polite">
+       <span class="progress-text" id="progressText">step 1 / 4</span>
+       <span class="progress-bar" aria-hidden="true"><span class="progress-fill" id="progressFill"></span></span>
+     </span>
      <span class="generation-mark" aria-hidden="true">∞</span>
 </div>
 <a class="studio-link" href="https://samg.studio" target="_blank" rel="noopener noreferrer">samg.studio</a>
@@ -842,6 +924,10 @@ const DEFAULT_PROMPT = 'Quantum Art 35mm Film';
 const PREVIOUS_DEFAULT_PROMPT = 'Quantum art';
 const API_STORAGE_KEY = 'infini_api_base';
 const PROMPT_STORAGE_KEY = 'infini_prompt';
+const CLIENT_ID_STORAGE_KEY = 'infini_client_id';
+const HOSTED_COMFY_API = 'https://samgs-mac-studio.tail3e92a8.ts.net:8443/infini';
+const KSAMPLER_NODE_ID = '57:3';
+const WORKFLOW_STEPS = 4;
 const PROMPT_EXAMPLES = [
   'Quantum Art 35mm Film',
   'Cinematic Kyoto rain garden, moss, lanterns, soft fog, 35mm film',
@@ -861,6 +947,7 @@ const PROMPT_EXAMPLES = [
   'Istanbul rooftop at sunrise, gulls, domes, warm Kodak film grain'
 ];
 let COMFY_HOST = getComfyHost();
+const CLIENT_ID = getClientId();
 let generations = [];          // { title, imgSrc, createdAt }
 let isGenerating = false;
 let isPlaying = false;
@@ -871,6 +958,7 @@ let generationRun = 0;
 let activePromptId = null;
 let latestPopIndex = -1;
 let currentRunPrompt = DEFAULT_PROMPT;
+let currentRunDimensions = { width: 1600, height: 900 };
 let hasRemoteWork = false;
 let audioContext = null;
 let currentDemoPrompt = PROMPT_EXAMPLES[0] || DEFAULT_PROMPT;
@@ -878,6 +966,9 @@ let demoPromptIndex = 0;
 let demoCharIndex = 0;
 let demoDirection = 1;
 let demoPromptTimer = null;
+let comfySocket = null;
+let socketReadyPromise = null;
+let generationProgress = { value: 0, max: WORKFLOW_STEPS };
 
 /* ── persist to localStorage ── */
 function save() {
@@ -888,7 +979,9 @@ function load() {
   generations = generations.map((gen) => ({
     title: gen.title || DEFAULT_PROMPT,
     imgSrc: normalizeImageSrc(gen.imgSrc),
-    createdAt: gen.createdAt || Date.now()
+    createdAt: gen.createdAt || Date.now(),
+    width: gen.width || 1600,
+    height: gen.height || 900
   }));
 }
 
@@ -917,12 +1010,35 @@ function savePrompt(value) {
   } catch {}
 }
 
+function createClientId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `infini-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getClientId() {
+  try {
+    const storedClientId = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
+    if (storedClientId) return storedClientId;
+
+    const clientId = createClientId();
+    localStorage.setItem(CLIENT_ID_STORAGE_KEY, clientId);
+    return clientId;
+  } catch {
+    return createClientId();
+  }
+}
+
 function isPrivateHost(hostname) {
   return hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.startsWith('192.168.') ||
     hostname.startsWith('10.') ||
     /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+}
+
+function isHostedHereNow(hostname) {
+  return hostname === 'samg.here.now' ||
+    hostname === 'deep-badge-hn6j.here.now';
 }
 
 function cleanApiBase(value) {
@@ -938,6 +1054,8 @@ function getComfyHost() {
     return queryApi;
   }
 
+  if (isHostedHereNow(location.hostname)) return HOSTED_COMFY_API;
+
   try {
     const storedApi = cleanApiBase(localStorage.getItem(API_STORAGE_KEY));
     if (storedApi) return storedApi;
@@ -949,6 +1067,17 @@ function getComfyHost() {
   return '';
 }
 
+function getGenerationDimensions() {
+  const isPortrait = window.innerHeight > window.innerWidth;
+  return isPortrait
+    ? { width: 900, height: 1600 }
+    : { width: 1600, height: 900 };
+}
+
+function applyArtOrientation(width, height) {
+  document.body.classList.toggle('art-portrait', Number(height) > Number(width));
+}
+
 function ensureComfyHost() {
   if (COMFY_HOST) return true;
 
@@ -958,6 +1087,95 @@ function ensureComfyHost() {
   COMFY_HOST = value;
   try { localStorage.setItem(API_STORAGE_KEY, COMFY_HOST); } catch {}
   return true;
+}
+
+function getProgressSocketUrl() {
+  if (!COMFY_HOST) return '';
+
+  try {
+    const url = new URL(COMFY_HOST, location.href);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}/ws`;
+    url.search = new URLSearchParams({ clientId: CLIENT_ID }).toString();
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function setGenerationProgress(value = 0, max = WORKFLOW_STEPS) {
+  const safeMax = Math.max(1, Number(max) || WORKFLOW_STEPS);
+  const safeValue = Math.max(0, Math.min(safeMax, Number(value) || 0));
+  const displayStep = Math.max(1, Math.min(safeMax, Math.ceil(safeValue)));
+  const percent = `${(safeValue / safeMax) * 100}%`;
+
+  generationProgress = { value: safeValue, max: safeMax };
+  $progressText.textContent = `step ${displayStep} / ${safeMax}`;
+  $progressFill.style.setProperty('--progress', percent);
+}
+
+function resetGenerationProgress() {
+  setGenerationProgress(0, WORKFLOW_STEPS);
+}
+
+function handleProgressMessage(event) {
+  let message;
+  try {
+    message = JSON.parse(event.data);
+  } catch {
+    return;
+  }
+
+  const data = message?.data || {};
+  if (data.prompt_id && activePromptId && data.prompt_id !== activePromptId) return;
+
+  if (message.type === 'progress' && (!data.node || data.node === KSAMPLER_NODE_ID)) {
+    setGenerationProgress(data.value, data.max || WORKFLOW_STEPS);
+  }
+}
+
+function closeProgressSocket() {
+  socketReadyPromise = null;
+  if (!comfySocket) return;
+
+  try { comfySocket.close(); } catch {}
+  comfySocket = null;
+}
+
+function openProgressSocket() {
+  if (!window.WebSocket || !COMFY_HOST) return Promise.resolve(false);
+  if (comfySocket?.readyState === WebSocket.OPEN) return Promise.resolve(true);
+  if (socketReadyPromise) return socketReadyPromise;
+
+  const socketUrl = getProgressSocketUrl();
+  if (!socketUrl) return Promise.resolve(false);
+
+  socketReadyPromise = new Promise((resolve) => {
+    let didResolve = false;
+    const resolveOnce = (value) => {
+      if (didResolve) return;
+      didResolve = true;
+      resolve(value);
+    };
+
+    try {
+      comfySocket = new WebSocket(socketUrl);
+      comfySocket.addEventListener('open', () => resolveOnce(true), { once: true });
+      comfySocket.addEventListener('message', handleProgressMessage);
+      comfySocket.addEventListener('error', () => resolveOnce(false), { once: true });
+      comfySocket.addEventListener('close', () => {
+        if (comfySocket?.readyState === WebSocket.CLOSED) comfySocket = null;
+        socketReadyPromise = null;
+      });
+      setTimeout(() => resolveOnce(comfySocket?.readyState === WebSocket.OPEN), 1400);
+    } catch {
+      comfySocket = null;
+      socketReadyPromise = null;
+      resolveOnce(false);
+    }
+  });
+
+  return socketReadyPromise;
 }
 
 function normalizeImageSrc(src) {
@@ -1037,6 +1255,11 @@ async function refreshRemoteWork() {
 
 async function generate(runId, promptText) {
   const prompt = cleanPrompt(promptText);
+  const dimensions = getGenerationDimensions();
+  currentRunDimensions = dimensions;
+  applyArtOrientation(dimensions.width, dimensions.height);
+  resetGenerationProgress();
+  await openProgressSocket();
   const workflow = {
       "57:28": {             // UNETLoader
         "class_type": "UNETLoader",
@@ -1069,8 +1292,8 @@ async function generate(runId, promptText) {
       "57:13": {             // EmptySD3LatentImage
         "class_type": "EmptySD3LatentImage",
         "inputs": {
-          "width": 2000,
-          "height": 1125,
+          "width": dimensions.width,
+          "height": dimensions.height,
           "batch_size": 1
         }
       },
@@ -1131,7 +1354,7 @@ async function generate(runId, promptText) {
         'Content-Type': 'application/json',
         'X-Infini-Client': '2'
       },
-      body: JSON.stringify({ prompt: workflow })
+      body: JSON.stringify({ prompt: workflow, client_id: CLIENT_ID })
         });
 
     if (!res.ok) throw new Error('Prompt failed');
@@ -1162,7 +1385,7 @@ async function generate(runId, promptText) {
             });
         if (subfolder) params.set('subfolder', subfolder);
         const url = `${COMFY_HOST}/view?${params}`;
-        onImageReady(url);
+        onImageReady(url, dimensions);
         return;
          }
       attempts++;
@@ -1174,6 +1397,7 @@ async function generate(runId, promptText) {
     console.error('[comfy]', err);
     isGenerating = false;
     isPlaying = false;
+    resetGenerationProgress();
     updatePlayState();
     $spinner.classList.remove('show');
        } finally {
@@ -1194,6 +1418,8 @@ const $imageLayers  = [
 ];
 const $placeholder  = document.getElementById('placeholder');
 const $spinner      = document.getElementById('spinner');
+const $progressText = document.getElementById('progressText');
+const $progressFill = document.getElementById('progressFill');
 const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
 const $galleryBtn   = document.getElementById('galleryBtn');
@@ -1472,11 +1698,18 @@ function loadMainImage(src, options = {}) {
 }
 
 /* When image arrives from ComfyUI */
-function onImageReady(url) {
+function onImageReady(url, dimensions = currentRunDimensions) {
   const imgSrc = normalizeImageSrc(url);
-  generations.push({ title: currentRunPrompt, imgSrc, createdAt: Date.now() });
+  generations.push({
+    title: currentRunPrompt,
+    imgSrc,
+    createdAt: Date.now(),
+    width: dimensions.width,
+    height: dimensions.height
+  });
   latestPopIndex = generations.length - 1;
   save();
+  setGenerationProgress(generationProgress.max, generationProgress.max);
   isGenerating = false;
 
   selectGeneration(generations.length - 1, false, true);
@@ -1505,6 +1738,7 @@ function updatePlayState() {
   $activePrompt.textContent = isRunning ? currentRunPrompt : '';
   const showIndicator = isGenerating || hasRemoteWork;
   $spinner.classList.toggle('is-first', showIndicator && generations.length === 0);
+  $spinner.classList.toggle('has-progress', showIndicator);
   $spinner.classList.toggle('show', showIndicator);
   updateGalleryVisibility();
 }
@@ -1518,6 +1752,7 @@ function startNextGeneration() {
   if (!isPlaying || isGenerating) return;
 
   isGenerating = true;
+  resetGenerationProgress();
   updatePlayState();
   generate(generationRun, currentRunPrompt);
 }
@@ -1529,6 +1764,8 @@ async function stopGeneration() {
   isGenerating = false;
   hasRemoteWork = false;
   activePromptId = null;
+  resetGenerationProgress();
+  closeProgressSocket();
   updatePlayState();
   await stopComfyWork();
   setTimeout(refreshRemoteWork, 750);
@@ -1556,8 +1793,12 @@ function resetLibrary() {
   hasRemoteWork = false;
   isGalleryVisible = true;
   activePromptId = null;
+  resetGenerationProgress();
+  closeProgressSocket();
   latestPopIndex = -1;
   currentGenerationIndex = -1;
+  currentRunDimensions = { width: 1600, height: 900 };
+  applyArtOrientation(currentRunDimensions.width, currentRunDimensions.height);
   generations = [];
 
   try { localStorage.removeItem('infinite_gen'); } catch {}
@@ -1671,6 +1912,7 @@ function selectGeneration(index, shouldRender = true, fromRight = false, options
 
   currentGenerationIndex = index;
   const gen = generations[index];
+  applyArtOrientation(gen.width || 1600, gen.height || 900);
   loadMainImage(gen.imgSrc, { playTransitionSound: fromRight });
   if (options.playSnap) playWaveSound('snap');
   $placeholder.textContent = '';

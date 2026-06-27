@@ -1,4 +1,6 @@
 const http = require('http');
+const net = require('net');
+const tls = require('tls');
 const fs = require('fs');
 const path = require('path');
 
@@ -30,6 +32,12 @@ function stripBasePath(pathname) {
 
 function shouldProxy(urlPath) {
   return proxyPrefixes.some((prefix) => urlPath === prefix || urlPath.startsWith(`${prefix}/`));
+}
+
+function getComfyProxyPath(pathname, search = '') {
+  const upstream = new URL(comfyHost);
+  const upstreamBase = upstream.pathname === '/' ? '' : upstream.pathname.replace(/\/+$/, '');
+  return `${upstreamBase}${pathname}${search}`;
 }
 
 function readBody(req) {
@@ -110,6 +118,48 @@ async function proxyToComfy(req, res) {
   }
 }
 
+function proxyWebSocket(req, socket, head) {
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  url.pathname = stripBasePath(url.pathname);
+
+  if (url.pathname !== '/ws') {
+    socket.destroy();
+    return;
+  }
+
+  const upstream = new URL(comfyHost);
+  const useTls = upstream.protocol === 'https:';
+  const upstreamPort = Number(upstream.port || (useTls ? 443 : 80));
+  const connect = useTls ? tls.connect : net.connect;
+  const upstreamSocket = connect(upstreamPort, upstream.hostname, () => {
+    const requestPath = getComfyProxyPath(url.pathname, url.search);
+    const lines = [
+      `GET ${requestPath} HTTP/1.1`,
+      `Host: ${upstream.host}`,
+      'Connection: Upgrade',
+      'Upgrade: websocket'
+    ];
+
+    for (const [name, value] of Object.entries(req.headers)) {
+      const lower = name.toLowerCase();
+      if (lower === 'host' || lower === 'connection' || lower === 'upgrade') continue;
+      if (Array.isArray(value)) {
+        value.forEach((item) => lines.push(`${name}: ${item}`));
+      } else if (value !== undefined) {
+        lines.push(`${name}: ${value}`);
+      }
+    }
+
+    upstreamSocket.write(`${lines.join('\r\n')}\r\n\r\n`);
+    if (head && head.length > 0) upstreamSocket.write(head);
+    upstreamSocket.pipe(socket);
+    socket.pipe(upstreamSocket);
+  });
+
+  upstreamSocket.on('error', () => socket.destroy());
+  socket.on('error', () => upstreamSocket.destroy());
+}
+
 function serveStatic(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   url.pathname = stripBasePath(url.pathname);
@@ -162,3 +212,5 @@ server.listen(port, host, () => {
   if (basePath) console.log(`mounted at ${basePath}`);
   console.log(`proxying ComfyUI at ${comfyHost}`);
 });
+
+server.on('upgrade', proxyWebSocket);
