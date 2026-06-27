@@ -64,6 +64,7 @@ function getCorsHeaders(req) {
     'access-control-allow-origin': allowOrigin,
     'access-control-allow-methods': 'GET,HEAD,POST,OPTIONS',
     'access-control-allow-headers': 'content-type,x-infini-client',
+    'access-control-allow-private-network': 'true',
     'access-control-max-age': '86400',
     'vary': 'origin'
   };

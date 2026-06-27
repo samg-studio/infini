@@ -994,6 +994,7 @@ const API_STORAGE_KEY = 'infini_api_base';
 const PROMPT_STORAGE_KEY = 'infini_prompt';
 const CLIENT_ID_STORAGE_KEY = 'infini_client_id';
 const HOSTED_COMFY_API = 'https://samgs-mac-studio.tail3e92a8.ts.net:8443/infini';
+const URL_PARAMS = new URLSearchParams(location.search);
 const KSAMPLER_NODE_ID = '57:3';
 const WORKFLOW_STEPS = 4;
 const ESTIMATED_STEP_MS = 6500;
@@ -1062,8 +1063,15 @@ function cleanPrompt(value) {
   return (value || '').trim() || DEFAULT_PROMPT;
 }
 
+function getQueryPrompt() {
+  return (URL_PARAMS.get('prompt') || '').trim();
+}
+
 function loadPrompt() {
   try {
+    const queryPrompt = getQueryPrompt();
+    if (queryPrompt) return queryPrompt;
+
     const storedPrompt = (localStorage.getItem(PROMPT_STORAGE_KEY) || '').trim();
     if (!storedPrompt || storedPrompt === PREVIOUS_DEFAULT_PROMPT || storedPrompt === DEFAULT_PROMPT) return '';
     return storedPrompt;
@@ -1114,13 +1122,23 @@ function isHostedHereNow(hostname) {
     hostname === 'deep-badge-hn6j.here.now';
 }
 
+function isTailscaleHost(hostname) {
+  return hostname.endsWith('.ts.net');
+}
+
 function cleanApiBase(value) {
   return (value || '').trim().replace(/\/+$/, '');
 }
 
+function getCurrentAppBase() {
+  const pathname = location.pathname
+    .replace(/\/index\.html$/i, '/')
+    .replace(/\/+$/, '');
+  return `${location.origin}${pathname}`;
+}
+
 function getComfyHost() {
-  const params = new URLSearchParams(location.search);
-  const queryApi = cleanApiBase(params.get('api'));
+  const queryApi = cleanApiBase(URL_PARAMS.get('api'));
 
   if (queryApi) {
     try { localStorage.setItem(API_STORAGE_KEY, queryApi); } catch {}
@@ -1128,6 +1146,7 @@ function getComfyHost() {
   }
 
   if (isHostedHereNow(location.hostname)) return HOSTED_COMFY_API;
+  if (isTailscaleHost(location.hostname)) return getCurrentAppBase();
 
   try {
     const storedApi = cleanApiBase(localStorage.getItem(API_STORAGE_KEY));
@@ -1174,6 +1193,41 @@ function getProgressSocketUrl() {
   } catch {
     return '';
   }
+}
+
+function shouldRequestLocalNetworkAccess(urlValue = COMFY_HOST) {
+  try {
+    const hostname = new URL(urlValue, location.href).hostname;
+    return isTailscaleHost(hostname) || isPrivateHost(hostname) || hostname.endsWith('.local');
+  } catch {
+    return false;
+  }
+}
+
+function getFetchOptions(options = {}, urlValue = COMFY_HOST) {
+  const fetchOptions = { ...options };
+  if (shouldRequestLocalNetworkAccess(urlValue)) {
+    fetchOptions.targetAddressSpace = 'local';
+  }
+  return fetchOptions;
+}
+
+async function fetchWithTimeout(urlValue, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(urlValue, getFetchOptions({
+      ...options,
+      signal: controller.signal
+    }, urlValue));
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function apiFetch(path, options = {}, timeoutMs = 15000) {
+  return fetchWithTimeout(`${COMFY_HOST}${path}`, options, timeoutMs);
 }
 
 function setGenerationProgress(value = 0, max = WORKFLOW_STEPS) {
@@ -1331,17 +1385,17 @@ function findGeneratedImage(historyItem) {
 
 async function interruptGeneration() {
   try {
-    await fetch(`${COMFY_HOST}/interrupt`, { method: 'POST' });
+    await apiFetch('/interrupt', { method: 'POST' }, 8000);
   } catch {}
 }
 
 async function clearComfyQueue() {
   try {
-    await fetch(`${COMFY_HOST}/queue`, {
+    await apiFetch('/queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clear: true })
-    });
+    }, 8000);
   } catch {}
 }
 
@@ -1356,7 +1410,7 @@ async function refreshRemoteWork() {
   if (!COMFY_HOST) return;
 
   try {
-    const res = await fetch(`${COMFY_HOST}/queue`, { cache: 'no-store' });
+    const res = await apiFetch('/queue', { cache: 'no-store' }, 8000);
     if (!res.ok) return;
 
     const queue = await res.json();
@@ -1465,14 +1519,14 @@ async function generate(runId, promptText) {
     };
 
   try {
-    const res = await fetch(`${COMFY_HOST}/prompt`, {
+    const res = await apiFetch('/prompt', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Infini-Client': '2'
       },
       body: JSON.stringify({ prompt: workflow, client_id: CLIENT_ID })
-        });
+        }, 25000);
 
     if (!res.ok) throw new Error('Prompt failed');
 
@@ -1487,7 +1541,7 @@ async function generate(runId, promptText) {
       await new Promise(r => setTimeout(r, 1500));
       if (runId !== generationRun || !isPlaying) return;
 
-      const hRes = await fetch(`${COMFY_HOST}/history/${promptId}`);
+      const hRes = await apiFetch(`/history/${promptId}`, { cache: 'no-store' }, 12000);
       const hData = await hRes.json();
 
       const imgInfo = findGeneratedImage(hData[promptId]);
@@ -1746,7 +1800,7 @@ async function smokeTestBridge() {
   if (!COMFY_HOST) return;
 
   try {
-    await fetch(`${COMFY_HOST}/system_stats`, { cache: 'no-store' });
+    await apiFetch('/system_stats', { cache: 'no-store' }, 8000);
   } catch (err) {
     console.warn('[infini] bridge smoke test failed', err);
   }
@@ -1895,6 +1949,42 @@ function startNextGeneration() {
   generate(generationRun, currentRunPrompt);
 }
 
+function shouldLaunchFromTailnetOrigin() {
+  if (!isHostedHereNow(location.hostname) || !COMFY_HOST) return false;
+
+  try {
+    const hostname = new URL(COMFY_HOST, location.href).hostname;
+    return isTailscaleHost(hostname) || isPrivateHost(hostname) || hostname.endsWith('.local');
+  } catch {
+    return false;
+  }
+}
+
+function buildTailnetLaunchUrl(promptText) {
+  const url = new URL(`${COMFY_HOST.replace(/\/+$/, '')}/`);
+  const prompt = cleanPrompt(promptText);
+  if (prompt) url.searchParams.set('prompt', prompt);
+  url.searchParams.set('start', '1');
+  return url.toString();
+}
+
+function launchTailnetApp(source = 'menu') {
+  playWaveSound(source === 'splash' ? 'splash' : 'start');
+  currentRunPrompt = getPromptText();
+  isPlaying = true;
+  isGenerating = true;
+  hasRemoteWork = false;
+  hideSplash();
+  resetGenerationProgress();
+  startProgressFallback();
+  updatePlayState();
+
+  const launchUrl = buildTailnetLaunchUrl(currentRunPrompt);
+  setTimeout(() => {
+    location.assign(launchUrl);
+  }, 260);
+}
+
 async function stopGeneration() {
   playWaveSound('stop');
   generationRun++;
@@ -1912,8 +2002,14 @@ async function stopGeneration() {
 
 function startGeneration(source = 'menu') {
   if (isPlaying || isGenerating) return;
-  playWaveSound(source === 'splash' ? 'splash' : 'start');
   if (!ensureComfyHost()) return;
+
+  if (shouldLaunchFromTailnetOrigin()) {
+    launchTailnetApp(source);
+    return;
+  }
+
+  playWaveSound(source === 'splash' ? 'splash' : 'start');
 
   generationRun++;
   currentRunPrompt = getPromptText();
@@ -2157,8 +2253,10 @@ function renderCarousel() {
 $promptInput.value = loadPrompt();
 currentRunPrompt = $promptInput.value || currentDemoPrompt;
 startPromptDemo();
-smokeTestBridge();
-refreshRemoteWork();
+if (!shouldLaunchFromTailnetOrigin()) {
+  smokeTestBridge();
+  refreshRemoteWork();
+}
 finishSplash();
 load();
 
@@ -2171,6 +2269,10 @@ if (generations.length > 0) {
 }
 
 updatePlayState();
+
+if (URL_PARAMS.get('start') === '1' && !isHostedHereNow(location.hostname)) {
+  setTimeout(() => startGeneration('splash'), 650);
+}
 
 
 </script>
