@@ -380,8 +380,12 @@
       overflow: hidden;
       position: relative;
       background: rgba(255,255,255,.02);
-      transition: opacity .7s ease;
+      transition: opacity .7s ease, filter .35s ease;
       }
+
+    body.is-prompt-focused:not(.fill-mode) .image-wrap {
+      filter: blur(10px) brightness(.58);
+    }
 
     .main-img {
       position: absolute;
@@ -529,7 +533,7 @@
     .spinner {
       position: fixed;
       right: 28px;
-      bottom: calc(env(safe-area-inset-bottom) + 36px);
+      bottom: calc(env(safe-area-inset-bottom) + 25px);
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -850,7 +854,7 @@
 
       .spinner {
         right: 18px;
-        bottom: calc(env(safe-area-inset-bottom) + 36px);
+        bottom: calc(env(safe-area-inset-bottom) + 24px);
       }
 
       .studio-link {
@@ -943,41 +947,33 @@
       pointer-events: none;
     }
 
-    .fill-exit {
-      position: fixed;
-      top: calc(env(safe-area-inset-top) + 18px);
-      right: calc(env(safe-area-inset-right) + 18px);
-      width: 36px;
-      height: 36px;
-      appearance: none;
-      background: rgba(0,0,0,.18);
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 50%;
-      color: rgba(255,255,255,.88);
-      cursor: pointer;
-      display: grid;
-      font: inherit;
-      font-size: 18px;
-      font-weight: 500;
-      line-height: 1;
-      opacity: 0;
-      padding: 0 0 1px;
-      place-items: center;
-      pointer-events: none;
-      text-shadow: 0 2px 14px rgba(0,0,0,.7);
-      transition: opacity .35s ease, background .25s ease, border-color .25s ease;
-      z-index: 900;
-    }
-
-    body.fill-mode.is-fill-exit-visible .fill-exit {
+    body.fill-mode.is-fill-exit-visible .fill-btn {
       opacity: .86;
       pointer-events: auto;
     }
 
-    body.fill-mode.is-fill-exit-visible .fill-exit:hover {
-      background: rgba(0,0,0,.32);
-      border-color: rgba(255,255,255,.3);
+    body.fill-mode.is-fill-exit-visible .fill-btn:hover {
       opacity: 1;
+    }
+
+    body.fill-mode .fill-icon::before {
+      top: 9px;
+      right: 2px;
+      width: 16px;
+      transform: rotate(45deg);
+      transform-origin: center;
+    }
+
+    body.fill-mode .fill-icon::after {
+      top: 9px;
+      right: 2px;
+      width: 16px;
+      height: 2px;
+      background: currentColor;
+      border: 0;
+      border-radius: 999px;
+      transform: rotate(-45deg);
+      transform-origin: center;
     }
 </style>
 </head>
@@ -1003,7 +999,6 @@
      </div>
      <button class="fill-btn" id="fillBtn" type="button" aria-label="Enter fullscreen"><span class="fill-icon" aria-hidden="true"></span></button>
 </div>
-<button class="fill-exit" id="fillExit" type="button" aria-label="Exit fullscreen">x</button>
 
 <!-- ── image area ── -->
 <div class="image-wrap" id="imageWrap">
@@ -1096,13 +1091,17 @@ function save() {
 }
 function load() {
   try { generations = JSON.parse(localStorage.getItem('infinite_gen') || '[]'); } catch { generations = []; }
-  generations = generations.map((gen) => ({
-    title: gen.title || DEFAULT_PROMPT,
-    imgSrc: normalizeImageSrc(gen.imgSrc),
-    createdAt: gen.createdAt || Date.now(),
-    width: gen.width || 1200,
-    height: gen.height || 675
-  }));
+  generations = generations
+    .filter((gen) => gen.clientId === CLIENT_ID)
+    .map((gen) => ({
+      title: gen.title || DEFAULT_PROMPT,
+      imgSrc: normalizeImageSrc(gen.imgSrc),
+      createdAt: gen.createdAt || Date.now(),
+      width: gen.width || 1200,
+      height: gen.height || 675,
+      clientId: gen.clientId
+    }));
+  save();
 }
 
 function cleanPrompt(value) {
@@ -1458,7 +1457,14 @@ function getHistoryTimestamp(historyItem, fallback) {
   return Number(match?.[1]?.timestamp) || fallback;
 }
 
+function getHistoryClientId(historyItem) {
+  return historyItem?.prompt?.[3]?.client_id || '';
+}
+
 function generationFromHistory(historyItem, order) {
+  const clientId = getHistoryClientId(historyItem);
+  if (clientId !== CLIENT_ID) return null;
+
   const imgInfo = findGeneratedImage(historyItem);
   if (!imgInfo?.filename || !imgInfo.filename.startsWith('Infinite_')) return null;
 
@@ -1468,7 +1474,8 @@ function generationFromHistory(historyItem, order) {
     imgSrc: normalizeImageSrc(buildImageUrl(imgInfo)),
     createdAt: getHistoryTimestamp(historyItem, Date.now() + order),
     width: dimensions.width,
-    height: dimensions.height
+    height: dimensions.height,
+    clientId
   };
 }
 
@@ -1722,7 +1729,6 @@ const $playBtn      = document.getElementById('playBtn');
 const $resetBtn     = document.getElementById('resetBtn');
 const $galleryBtn   = document.getElementById('galleryBtn');
 const $fillBtn      = document.getElementById('fillBtn');
-const $fillExit     = document.getElementById('fillExit');
 const $promptDock   = document.getElementById('promptDock');
 const $promptInput  = document.getElementById('promptInput');
 const $promptClear  = document.getElementById('promptClear');
@@ -2052,7 +2058,8 @@ function onImageReady(url, dimensions = currentRunDimensions) {
     imgSrc,
     createdAt: Date.now(),
     width: dimensions.width,
-    height: dimensions.height
+    height: dimensions.height,
+    clientId: CLIENT_ID
   });
   latestPopIndex = generations.length - 1;
   save();
@@ -2242,6 +2249,12 @@ $promptInput.addEventListener('input', () => {
   startPromptDemo();
 });
 $promptInput.addEventListener('change', () => savePrompt($promptInput.value));
+$promptInput.addEventListener('focus', () => {
+  document.body.classList.add('is-prompt-focused');
+});
+$promptInput.addEventListener('blur', () => {
+  document.body.classList.remove('is-prompt-focused');
+});
 $promptInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
@@ -2350,11 +2363,6 @@ $fillBtn.addEventListener('click', () => {
   } else {
     enterFillMode();
   }
-});
-
-$fillExit.addEventListener('click', (e) => {
-  e.stopPropagation();
-  exitFillMode();
 });
 
 document.addEventListener('fullscreenchange', () => {
