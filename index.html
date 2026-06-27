@@ -143,7 +143,10 @@
       align-items: flex-start;
       justify-content: space-between;
       padding: 44px 48px 0;
-      position: relative;
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 600;
       }
 
@@ -186,16 +189,25 @@
       appearance: none;
       background: transparent;
       border: 0;
-      border-bottom: 1px solid rgba(255,255,255,.18);
       border-radius: 0;
       color: rgba(255,255,255,.92);
       font: inherit;
       font-size: 18px;
       font-weight: 400;
       line-height: 1.35;
+      min-height: 58px;
+      max-height: 136px;
       outline: none;
-      padding: 0 28px 9px 0;
-      transition: border-color .25s ease, color .25s ease;
+      overflow-y: auto;
+      padding: 0 28px 0 0;
+      resize: none;
+      scrollbar-width: none;
+      transition: color .25s ease;
+      white-space: pre-wrap;
+    }
+
+    .prompt-input::-webkit-scrollbar {
+      display: none;
     }
 
     .prompt-input::placeholder {
@@ -208,7 +220,6 @@
     }
 
     .prompt-input:focus {
-      border-color: rgba(255,255,255,.58);
       color: #fff;
     }
 
@@ -950,6 +961,7 @@
         right: 0;
         max-width: none;
         padding: calc(env(safe-area-inset-top) + 18px) 18px 0;
+        transform: none;
         z-index: 600;
       }
 
@@ -1036,6 +1048,7 @@
       max-width: none;
       padding: 0;
       pointer-events: none;
+      transform: none;
     }
 
     body.fill-mode .prompt-dock {
@@ -1142,7 +1155,7 @@
        </div>
      </div>
      <div class="prompt-dock" id="promptDock">
-       <input class="prompt-input" id="promptInput" type="text" autocomplete="off" spellcheck="false" aria-label="Prompt" />
+       <textarea class="prompt-input" id="promptInput" rows="2" autocomplete="off" spellcheck="false" aria-label="Prompt"></textarea>
        <button class="prompt-clear" id="promptClear" type="button" aria-label="Clear prompt">x</button>
      </div>
      <button class="fill-btn" id="fillBtn" type="button" aria-label="Enter fullscreen"><span class="fill-icon" aria-hidden="true"></span></button>
@@ -1184,7 +1197,9 @@
 /* ═══════════════════════════════════════
    State & Config
    ═══════════════════════════════════════ */
-const DEFAULT_PROMPT = 'Advertising quality symmetrical 35mm film portrait, short-haired woman in a teal suit looking bored in a mustard kitchen, close-up face, soft grain';
+const PROMPT_FOUNDATION = '35mm photography, advertising style, film grain, Wes Anderson style, symmetrical deadpan cinematic composition, pastel color blocking, precise theatrical set design';
+const DEFAULT_STORY = 'Two tired architects in cream suits standing in a mint airport lounge, one holding flowers, centered close-up faces';
+const DEFAULT_PROMPT = `${DEFAULT_STORY}, ${PROMPT_FOUNDATION}`;
 const API_STORAGE_KEY = 'infini_api_base';
 const PROMPT_STORAGE_KEY = 'infini_prompt';
 const CLIENT_ID_STORAGE_KEY = 'infini_client_id';
@@ -1198,29 +1213,30 @@ const SLOW_IMAGE_TRANSITION_MS = 4600;
 const PROMPT_DEMO_HOLD_MS = 3000;
 const PROMPT_EXAMPLES = [
   DEFAULT_PROMPT,
-  'Deadpan luxury campaign, woman with blunt black bob in a crimson suit at a mint breakfast table, centered face close-up, precise pastel symmetry, 35mm film grain',
-  'Symmetrical editorial kitchen scene, bored woman in powder blue tailoring holding a tiny espresso, close to face, lemon yellow cabinets, cinematic 35mm grain',
-  'Advertising quality close-up, short-haired woman in a white suit staring past camera in a cherry red kitchen, centered composition, clean color blocking, film grain',
-  'Deadpan fashion campaign, couple in matching green suits standing in a pink tiled kitchen, both bored, close-up two-shot, symmetrical 35mm cinema still',
-  'Symmetrical hotel-suite kitchen, woman with copper short hair in a navy suit and orange silk shirt, bored expression, close face portrait, glossy ad lighting',
-  'Centered 35mm film close-up, short-haired woman in a violet suit leaning on a chrome counter, avocado kitchen walls, perfectly balanced color palette',
-  'Luxury appliance advertisement, bored woman in charcoal tailoring framed by yellow cabinets and red flowers, close-up face, symmetrical deadpan cinema',
-  'Pastel fashion editorial, two people in cream suits in a turquoise kitchen looking politely exhausted, close-up faces, balanced advertising composition',
-  'Symmetrical 35mm film portrait, woman with short silver hair in emerald suit, bored in an immaculate orange kitchen, face close to lens, fine grain',
-  'Deadpan perfume campaign, woman in a black suit and pearl collar inside a pink kitchen, one eyebrow raised, centered close-up, saturated 35mm grain',
-  'Advertising quality scene, short-haired woman in a burgundy suit beside a green refrigerator, bored close-up face, exact symmetry, soft cinematic grain',
-  'Couple in cobalt and butter-yellow suits at a tiny kitchen island, both looking bored, close-up two-person portrait, symmetrical color-blocked 35mm',
-  'Editorial campaign still, woman in ivory tailoring with short hair, bored in a pistachio kitchen full of oranges, centered face close-up, film grain',
-  'Symmetrical deadpan cinema portrait, woman in a rose suit under fluorescent kitchen light, short hair, bored face, powder blue tiles, 35mm texture',
-  'Advertising quality domestic scene, two women in sharp suits in a lemon kitchen, one bored and one amused, close-up faces, centered pastel composition',
-  'Luxury cookware campaign, short-haired woman in a slate suit holding a red saucepan, bored kitchen close-up, exact centered framing, 35mm film grain',
-  'Color-blocked fashion ad, woman in a tangerine suit against seafoam cabinets, deadpan close-up face, symmetrical set design, soft film grain',
-  'Symmetrical close-up portrait, bored woman with short hair in a chocolate suit, pale pink kitchen, tiny birthday cake on counter, cinematic 35mm',
-  'Advertising campaign still, couple in tailored red and navy suits under mint kitchen cabinets, blank expressions, close faces, balanced 35mm grain',
-  'Deadpan kitchen drama, short-haired woman in a lavender suit looking bored beside an untouched pie, centered face close-up, clean pastel ad lighting',
-  'Symmetrical fashion portrait, woman in a forest green suit and white gloves inside a tomato red kitchen, bored expression, 35mm film grain',
-  'High-end magazine ad, two people in monochrome suits separated by a yellow kitchen table, both expressionless, close-up, precise centered composition',
-  'Bored woman with short hair in a royal blue suit, close to face in a spotless cream kitchen, red lipstick, symmetrical advertising still, film grain'
+  `A short-haired hotel detective in a burgundy suit interviewing twin bellhops in a lemon lobby, centered close-up faces, ${PROMPT_FOUNDATION}`,
+  `A bored woman in a cobalt suit waiting beside a tiny birthday cake in a pistachio diner, one waiter frozen mid-pour, ${PROMPT_FOUNDATION}`,
+  `Two rival florists in ivory suits standing inside a pink train carriage full of yellow flowers, polite deadpan expressions, ${PROMPT_FOUNDATION}`,
+  `A couple in matching green tailoring at an empty seaside laundromat, one holding a red umbrella and one holding a bouquet, ${PROMPT_FOUNDATION}`,
+  `A nervous chess champion in a powder blue suit facing three silent judges in a mint hotel ballroom, centered tableau, ${PROMPT_FOUNDATION}`,
+  `A glamorous dentist in a white suit and orange gloves posing with a bored patient in a turquoise exam room, ${PROMPT_FOUNDATION}`,
+  `Two museum guards in crimson uniforms staring at a missing painting on a lavender wall, symmetrical close-up scene, ${PROMPT_FOUNDATION}`,
+  `A woman with silver hair in an emerald suit standing in a tiny yellow elevator with two poodles and a briefcase, ${PROMPT_FOUNDATION}`,
+  `A tailor in a violet jacket measuring a very serious bride in a tomato red fitting room, theatrical centered portrait, ${PROMPT_FOUNDATION}`,
+  `Two exhausted astronauts in cream suits eating toast in a mint kitchen after returning from space, deadpan close-up faces, ${PROMPT_FOUNDATION}`,
+  `A perfume saleswoman in a black suit presenting one tiny bottle to a suspicious couple in a coral department store, ${PROMPT_FOUNDATION}`,
+  `Three wedding guests in pastel suits waiting at an empty bus stop with one enormous cake box, centered deadpan composition, ${PROMPT_FOUNDATION}`,
+  `A saxophonist in a tangerine suit and a silent dancer in blue standing in a deserted hotel pool, surreal advertising portrait, ${PROMPT_FOUNDATION}`,
+  `A woman in a slate suit reading a resignation letter inside a peach office full of identical green lamps, close-up face, ${PROMPT_FOUNDATION}`,
+  `Two chefs in tailored suits standing in a ruby red pantry holding one perfect boiled egg, restrained deadpan comedy, ${PROMPT_FOUNDATION}`,
+  `A family of four in monochrome suits posed in a mint motel room with matching suitcases and blank expressions, ${PROMPT_FOUNDATION}`,
+  `A retired magician in a chocolate suit sitting at a yellow kitchen table with a white rabbit-shaped cake, centered portrait, ${PROMPT_FOUNDATION}`,
+  `Two antique dealers in rose and navy suits inspecting a tiny clock in a pale blue greenhouse, close-up theatrical scene, ${PROMPT_FOUNDATION}`,
+  `A woman in a white linen suit and red gloves staring through a train window at a pink desert station, precise centered frame, ${PROMPT_FOUNDATION}`,
+  `A young conductor in a mustard suit arguing silently with a woman in teal at an empty miniature opera house, ${PROMPT_FOUNDATION}`,
+  `Two bored lifeguards in formal suits standing at a pastel indoor pool with one red rescue ring, ${PROMPT_FOUNDATION}`,
+  `A botanist in an emerald suit and short copper hair holding a glass terrarium in a yellow laboratory, close-up face, ${PROMPT_FOUNDATION}`,
+  `A couple in butter yellow and burgundy tailoring posing in a tiny airport gift shop with identical postcards, ${PROMPT_FOUNDATION}`,
+  `A woman in a royal blue suit looking unimpressed in a mint kitchen while three identical cakes cool behind her, ${PROMPT_FOUNDATION}`
 ];
 const SUIT_COLORS = [
   'teal', 'crimson', 'powder blue', 'ivory', 'emerald', 'violet',
@@ -1238,31 +1254,100 @@ const HAIR_DETAILS = [
   'dark auburn waves tucked behind one ear', 'platinum bowl cut', 'jet black short curls',
   'chestnut fringe', 'icy blue-black bob', 'soft brown cropped hair'
 ];
-const SCENE_DETAILS = [
-  'mustard kitchen with chrome handles', 'mint tiled breakfast nook',
-  'pistachio kitchen with oranges on the counter', 'tomato red galley kitchen',
-  'powder blue cabinets and a tiny espresso cup', 'pink tiled kitchen with red flowers',
-  'cream kitchen with one untouched pie', 'seafoam cabinets and a silver refrigerator',
-  'lemon yellow kitchen island', 'avocado walls and glossy black counters'
+const LOCATION_VARIATIONS = [
+  'mint airport lounge with chrome chairs', 'pistachio diner with red vinyl booths',
+  'coral hotel lobby with brass keys', 'lavender train carriage with yellow curtains',
+  'powder blue museum room', 'tomato red fitting room', 'peach office with green lamps',
+  'turquoise exam room', 'ruby red pantry', 'pale blue greenhouse',
+  'miniature opera house', 'pastel indoor pool', 'yellow laboratory',
+  'tiny airport gift shop', 'cream motel room'
 ];
 const CHARACTER_PROPS = [
   'holding a tiny espresso', 'beside an untouched pie', 'with one red saucepan',
-  'next to a single birthday candle', 'wearing pearl earrings', 'holding white gloves',
-  'with a crystal glass of water', 'beside a bowl of oranges',
-  'with a folded newspaper', 'next to a chrome toaster'
+  'next to a single birthday candle', 'holding white gloves', 'with a glass terrarium',
+  'beside a bowl of oranges', 'with a folded newspaper', 'holding a bouquet',
+  'carrying a red umbrella', 'with a tiny perfume bottle', 'holding a brass key',
+  'beside an enormous cake box', 'with one perfect boiled egg', 'holding identical postcards'
 ];
 const FILM_DETAILS = [
-  'soft 35mm grain', 'Kodak-style color warmth', 'subtle halation on highlights',
+  'soft 35mm film grain', 'Kodak-style color warmth', 'subtle halation on highlights',
   'clean advertising light', 'matte editorial color', 'precise centered symmetry',
   'deadpan close-up framing', 'gentle lens softness', 'balanced pastel color blocking',
-  'quiet luxury campaign finish'
+  'quiet luxury campaign finish', 'Wes Anderson style centered tableau',
+  'storybook production design', 'symmetrical theatrical blocking'
 ];
-const GENERAL_VARIATIONS = [
-  'change the palette, materials, and light while preserving the exact subject and composition',
-  'shift the time of day, texture, and atmosphere while keeping the same scene bones',
-  'vary the styling, props, and color world without changing the core subject',
-  'keep the same framing and mood, but alter surfaces, weather, and small objects',
-  'preserve the same central idea, with a new color palette and production design'
+const WARDROBE_DETAILS = [
+  'matching silk ties', 'white gloves', 'striped socks', 'patent leather shoes',
+  'pearl earrings', 'tiny lapel pins', 'monochrome pocket squares',
+  'oversized eyeglasses', 'red leather gloves', 'cream turtlenecks'
+];
+const PALETTE_DETAILS = [
+  'mint, coral, and butter yellow palette', 'tomato red and powder blue palette',
+  'pistachio, ivory, and burgundy palette', 'lavender, cobalt, and cream palette',
+  'peach, emerald, and chocolate palette', 'turquoise, rose, and mustard palette',
+  'slate, lemon, and cherry palette', 'seafoam, navy, and tangerine palette'
+];
+const CAMERA_DETAILS = [
+  'centered close-up faces', 'waist-up formal portrait', 'perfectly flat frontal view',
+  'slightly wider symmetrical tableau', 'tight advertising portrait',
+  'medium shot with repeated background props', 'deadpan two-shot',
+  'precise centered composition with negative space'
+];
+const MOOD_DETAILS = [
+  'bored but elegant expressions', 'polite exhaustion', 'quiet suspicion',
+  'tiny awkward smile', 'formal disappointment', 'ceremonial calm',
+  'deadpan confusion', 'expensive loneliness', 'restrained comedy',
+  'serious faces in an absurd situation'
+];
+const PEOPLE_CAST_DETAILS = [
+  'cast with a Black woman in her 40s and a South Asian man in his 30s',
+  'cast with an East Asian older woman and a young Latino assistant',
+  'cast with a Middle Eastern couple in their 50s',
+  'cast with a mixed-heritage family spanning teenager, parent, and grandparent',
+  'cast with an Indigenous older lead and a white younger clerk',
+  'cast with a Black elderly man and an East Asian young adult woman',
+  'cast with two women in their 20s from different backgrounds',
+  'cast with a Latina middle-aged lead and a South Asian older woman',
+  'cast with a white older couple and a Black teenage bellhop',
+  'cast with a Southeast Asian young adult and a Middle Eastern older companion',
+  'cast with a multiracial group of friends in their 30s',
+  'cast with an elderly woman, a child, and a sharply dressed adult guardian'
+];
+const PEOPLE_RELATIONSHIP_DETAILS = [
+  'as business partners pretending not to argue',
+  'as siblings waiting for bad news',
+  'as rivals forced into the same room',
+  'as a mentor and apprentice in awkward silence',
+  'as strangers accidentally dressed the same',
+  'as a family posed too formally',
+  'as colleagues after a failed presentation',
+  'as newlyweds looking politely exhausted',
+  'as hotel staff and a difficult guest',
+  'as old friends avoiding eye contact'
+];
+const SUBJECT_VARIATION_DETAILS = [
+  'change the main object material to chrome, velvet, glass, or painted wood',
+  'alter the scale so one object feels oddly too large or too small',
+  'swap the hero prop for a new color-matched object',
+  'change the surface texture while preserving the same silhouette',
+  'rearrange background objects into a stricter symmetrical pattern',
+  'shift the setting from interior to exterior while keeping the same subject logic',
+  'add one unexpected ceremonial object',
+  'change the weather or time of day without changing the central subject',
+  'introduce a repeated graphic shape in the background',
+  'make the palette more formal, playful, or quietly surreal'
+];
+const CIRCUMSTANCE_DETAILS = [
+  'during a delayed train announcement', 'after a tiny cake disaster',
+  'while everyone waits for a missing guest', 'during a formal room inspection',
+  'as rain starts outside the window', 'after a bouquet has been delivered to the wrong person',
+  'during an awkward birthday toast', 'while a suitcase has gone missing',
+  'after a power outage leaves one lamp glowing', 'during a silent argument',
+  'while someone has just read a mysterious letter', 'after a waiter drops one silver spoon',
+  'during a ceremonial handoff of a tiny object', 'while the wrong uniform has arrived',
+  'as confetti falls too early', 'after the elevator stops between floors',
+  'during a rehearsal with no audience', 'while a red phone rings unanswered',
+  'after the main character notices a stain on their sleeve', 'during a polite emergency'
 ];
 let COMFY_HOST = getComfyHost();
 const CLIENT_ID = getClientId();
@@ -1325,33 +1410,46 @@ function pickDetail(list, index, salt) {
   return list[(index * 7 + salt * 11 + Math.floor(Math.random() * list.length)) % list.length];
 }
 
-function isCharacterScenePrompt(prompt) {
-  return /suit|woman|man|person|people|portrait|face|hair|kitchen|couple|character/i.test(prompt);
+function promptHasPeople(prompt) {
+  return /woman|man|person|people|couple|family|guest|architect|detective|bellhop|florist|champion|dentist|patient|guard|tailor|bride|astronaut|saleswoman|lifeguard|botanist|friends|siblings|colleagues|portrait|face|hair|suit/i.test(prompt || '');
+}
+
+function ensurePromptFoundation(prompt) {
+  const base = (prompt || '').trim();
+  if (!base) return DEFAULT_PROMPT;
+  if (/35mm|film grain|advertising/i.test(base)) return base;
+  return `${base}, ${PROMPT_FOUNDATION}`;
 }
 
 function buildPromptVariation(basePrompt, index = 0) {
-  const base = cleanPrompt(basePrompt);
+  const base = ensurePromptFoundation(cleanPrompt(basePrompt));
+  const hasPeople = promptHasPeople(base);
+  const peopleDetails = hasPeople ? [
+    pickDetail(PEOPLE_CAST_DETAILS, index, 1),
+    pickDetail(PEOPLE_RELATIONSHIP_DETAILS, index, 2),
+    `${pickDetail(SUIT_COLORS, index, 3)} ${pickDetail(SUIT_STYLES, index, 4)}`,
+    pickDetail(WARDROBE_DETAILS, index, 5),
+    pickDetail(HAIR_DETAILS, index, 6),
+    pickDetail(CHARACTER_PROPS, index, 7),
+    pickDetail(MOOD_DETAILS, index, 8)
+  ] : [
+    pickDetail(SUBJECT_VARIATION_DETAILS, index, 1),
+    pickDetail(SUBJECT_VARIATION_DETAILS, index, 2)
+  ];
 
-  if (!isCharacterScenePrompt(base)) {
-    return [
-      base,
-      `Keep the same core subject, composition, and mood.`,
-      `Infinite variation ${index + 1}: ${pickDetail(GENERAL_VARIATIONS, index, 1)}, ${pickDetail(FILM_DETAILS, index, 2)}.`
-    ].join(' ');
-  }
-
-  const details = [
-    `${pickDetail(SUIT_COLORS, index, 1)} ${pickDetail(SUIT_STYLES, index, 2)}`,
-    pickDetail(HAIR_DETAILS, index, 3),
-    pickDetail(SCENE_DETAILS, index, 4),
-    pickDetail(CHARACTER_PROPS, index, 5),
-    pickDetail(FILM_DETAILS, index, 6)
+  const seriesDetails = [
+    ...peopleDetails,
+    pickDetail(CIRCUMSTANCE_DETAILS, index, 9),
+    pickDetail(LOCATION_VARIATIONS, index, 10),
+    pickDetail(PALETTE_DETAILS, index, 11),
+    pickDetail(CAMERA_DETAILS, index, 12),
+    pickDetail(FILM_DETAILS, index, 13)
   ].filter(Boolean);
 
   return [
     base,
-    `Keep the same core subject, close-up framing, deadpan mood, and scene bones.`,
-    `Infinite variation ${index + 1}: change details to ${details.join(', ')}.`
+    `Series rule: preserve the same story bones or subject logic, centered/deadpan composition, and advertising-photography polish.`,
+    `Follow-up generation ${index + 1}: vary the series with a new circumstance and details: ${seriesDetails.join(', ')}.`
   ].join(' ');
 }
 
@@ -2186,11 +2284,20 @@ function updatePromptClearButton() {
   $promptClear.disabled = $promptInput.readOnly || !hasValue;
 }
 
+function resizePromptInput() {
+  if (!$promptInput) return;
+
+  $promptInput.style.height = 'auto';
+  const maxHeight = Number.parseFloat(getComputedStyle($promptInput).maxHeight) || 136;
+  $promptInput.style.height = `${Math.min($promptInput.scrollHeight, maxHeight)}px`;
+}
+
 function updatePromptDemoPlaceholder() {
   if (!$promptInput || ($promptInput.value || '').trim()) return;
 
   const typedExample = currentDemoPrompt.slice(0, demoCharIndex);
   $promptInput.placeholder = typedExample;
+  resizePromptInput();
 }
 
 function stopPromptDemo() {
@@ -2242,6 +2349,7 @@ function advancePromptDemo() {
     demoCharIndex = 0;
     $promptInput.placeholder = '';
     $promptInput.classList.remove('is-demo-fading');
+    resizePromptInput();
     schedulePromptDemo(420 + Math.random() * 520);
   }, 620);
 }
@@ -2258,6 +2366,7 @@ function startPromptDemo() {
   currentDemoPrompt = PROMPT_EXAMPLES[demoPromptIndex] || DEFAULT_PROMPT;
   demoCharIndex = 0;
   $promptInput.placeholder = '';
+  resizePromptInput();
   schedulePromptDemo(220);
 }
 
@@ -2957,6 +3066,7 @@ $resetBtn.addEventListener('click', resetLibrary);
 
 $promptInput.addEventListener('input', () => {
   const hasValue = Boolean(($promptInput.value || '').trim());
+  resizePromptInput();
   updatePromptClearButton();
 
   if (hasValue) {
@@ -2977,7 +3087,7 @@ $promptInput.addEventListener('blur', () => {
   document.body.classList.remove('is-prompt-focused');
 });
 $promptInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
     e.preventDefault();
     $promptInput.blur();
     if (!isPlaying && !isGenerating) $playBtn.click();
@@ -2989,6 +3099,7 @@ $promptClear.addEventListener('click', () => {
 
   $promptInput.value = '';
   savePrompt('');
+  resizePromptInput();
   updatePromptClearButton();
   startPromptDemo();
   $promptInput.focus();
@@ -3021,7 +3132,7 @@ function showFillExitControl(duration = 3600) {
 }
 
 function isInteractiveTarget(target) {
-  return Boolean(target?.closest?.('button, input, a'));
+  return Boolean(target?.closest?.('button, input, textarea, a'));
 }
 
 function startFillSwipe(e) {
@@ -3256,6 +3367,7 @@ function renderCarousel() {
    ═══════════════════════════════════════ */
 async function init() {
   $promptInput.value = loadPrompt();
+  resizePromptInput();
   currentRunPrompt = $promptInput.value || autoPromptSeed || currentDemoPrompt || DEFAULT_PROMPT;
 
   if (shouldUseTailnetOrigin()) {
