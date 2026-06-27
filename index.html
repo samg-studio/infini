@@ -180,8 +180,10 @@
       top: 44px;
       left: 50%;
       width: min(48vw, 540px);
+      border: 1px solid transparent;
+      border-radius: 16px;
       transform: translateX(-50%);
-      transition: opacity .35s ease;
+      transition: background .25s ease, border-color .25s ease, box-shadow .25s ease, opacity .35s ease;
       }
 
     .prompt-input {
@@ -190,6 +192,7 @@
       background: transparent;
       border: 0;
       border-radius: 0;
+      box-sizing: border-box;
       color: rgba(255,255,255,.92);
       font: inherit;
       font-size: 18px;
@@ -199,11 +202,28 @@
       max-height: 136px;
       outline: none;
       overflow-y: auto;
-      padding: 0 28px 0 0;
+      padding: 0 28px;
       resize: none;
       scrollbar-width: none;
-      transition: color .25s ease;
+      text-align: center;
+      transition: color .25s ease, text-shadow .25s ease;
       white-space: pre-wrap;
+    }
+
+    body.is-prompt-focused .prompt-dock,
+    .prompt-dock.has-value {
+      background: rgba(0,0,0,.56);
+      border-color: rgba(255,255,255,.08);
+      box-shadow: 0 16px 42px rgba(0,0,0,.34);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    body.is-prompt-focused .prompt-input,
+    .prompt-dock.has-value .prompt-input {
+      min-height: 54px;
+      padding: 14px 44px;
+      text-shadow: none;
     }
 
     .prompt-input::-webkit-scrollbar {
@@ -230,8 +250,8 @@
 
     .prompt-clear {
       position: absolute;
-      top: 0;
-      right: 0;
+      top: 14px;
+      right: 14px;
       width: 22px;
       height: 24px;
       appearance: none;
@@ -790,7 +810,15 @@
       height: 172px;
       overflow: visible;
       pointer-events: auto;
+      cursor: grab;
+      touch-action: pan-y;
+      user-select: none;
+      -webkit-user-select: none;
       }
+
+    .carousel-inner.is-dragging {
+      cursor: grabbing;
+    }
 
     .carousel-viewport {
       position: absolute;
@@ -976,13 +1004,16 @@
       }
 
       .prompt-dock {
-        top: calc(env(safe-area-inset-top) + 18px);
-        width: min(70vw, 360px);
-        max-width: calc(100vw - 132px);
+        position: fixed;
+        top: calc(env(safe-area-inset-top) + 218px);
+        width: min(calc(100vw - 40px), 420px);
+        max-width: none;
+        z-index: 620;
       }
 
       .prompt-input {
         font-size: 16px;
+        max-height: 156px;
         text-shadow: 0 2px 14px rgba(0,0,0,.68);
       }
 
@@ -2273,6 +2304,13 @@ let fillExitTimer = null;
 let fillSwipeStartX = 0;
 let fillSwipeStartY = 0;
 let fillSwipePointerId = null;
+let carouselPointerId = null;
+let carouselStartX = 0;
+let carouselStartY = 0;
+let carouselStepX = 0;
+let carouselDidDrag = false;
+let carouselSuppressClick = false;
+let carouselWheelDelta = 0;
 
 function getPromptText() {
   savePrompt(getTypedPrompt());
@@ -2293,12 +2331,17 @@ function resizePromptInput() {
   $promptInput.style.height = `${Math.min($promptInput.scrollHeight, maxHeight)}px`;
 }
 
+function schedulePromptResize() {
+  requestAnimationFrame(resizePromptInput);
+}
+
 function updatePromptDemoPlaceholder() {
   if (!$promptInput || ($promptInput.value || '').trim()) return;
 
   const typedExample = currentDemoPrompt.slice(0, demoCharIndex);
   $promptInput.placeholder = typedExample;
   resizePromptInput();
+  schedulePromptResize();
 }
 
 function stopPromptDemo() {
@@ -3068,8 +3111,9 @@ $resetBtn.addEventListener('click', resetLibrary);
 
 $promptInput.addEventListener('input', () => {
   const hasValue = Boolean(($promptInput.value || '').trim());
-  resizePromptInput();
   updatePromptClearButton();
+  resizePromptInput();
+  schedulePromptResize();
 
   if (hasValue) {
     stopPromptDemo();
@@ -3084,6 +3128,7 @@ $promptInput.addEventListener('input', () => {
 $promptInput.addEventListener('change', () => savePrompt($promptInput.value));
 $promptInput.addEventListener('focus', () => {
   document.body.classList.add('is-prompt-focused');
+  schedulePromptResize();
 });
 $promptInput.addEventListener('blur', () => {
   document.body.classList.remove('is-prompt-focused');
@@ -3274,6 +3319,104 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   cycleGalleryByKeyboard(e.key === 'ArrowRight' ? 1 : -1);
 });
+
+function canScrollCarousel() {
+  return !isFillMode &&
+    isGalleryVisible &&
+    !isGridPanelOpen() &&
+    generations.length > 1;
+}
+
+function moveCarouselSelection(direction) {
+  const currentIndex = currentGenerationIndex >= 0 ? currentGenerationIndex : generations.length - 1;
+  const nextIndex = Math.max(0, Math.min(generations.length - 1, currentIndex + direction));
+  if (nextIndex === currentIndex) return false;
+
+  selectGeneration(nextIndex, true, false, { playSnap: true });
+  return true;
+}
+
+function startCarouselSwipe(e) {
+  if (!canScrollCarousel() || e.button > 0) return;
+
+  carouselPointerId = e.pointerId;
+  carouselStartX = e.clientX;
+  carouselStartY = e.clientY;
+  carouselStepX = e.clientX;
+  carouselDidDrag = false;
+  $carouselInner.classList.add('is-dragging');
+
+  try { $carouselInner.setPointerCapture(e.pointerId); } catch {}
+}
+
+function dragCarouselSwipe(e) {
+  if (carouselPointerId !== e.pointerId) return;
+
+  const totalX = e.clientX - carouselStartX;
+  const totalY = e.clientY - carouselStartY;
+  if (Math.abs(totalX) < 10 && Math.abs(totalY) < 10) return;
+  if (Math.abs(totalX) < Math.abs(totalY) * 1.15) return;
+
+  e.preventDefault();
+
+  const deltaX = e.clientX - carouselStepX;
+  if (Math.abs(deltaX) < 44) return;
+
+  const didMove = moveCarouselSelection(deltaX < 0 ? 1 : -1);
+  carouselStepX = e.clientX;
+  carouselDidDrag = carouselDidDrag || didMove;
+}
+
+function finishCarouselSwipe(e) {
+  if (carouselPointerId !== e.pointerId) return;
+
+  const totalX = e.clientX - carouselStartX;
+  const totalY = e.clientY - carouselStartY;
+
+  if (!carouselDidDrag && Math.abs(totalX) >= 52 && Math.abs(totalX) >= Math.abs(totalY) * 1.35) {
+    carouselDidDrag = moveCarouselSelection(totalX < 0 ? 1 : -1);
+  }
+
+  try { $carouselInner.releasePointerCapture(e.pointerId); } catch {}
+  carouselPointerId = null;
+  $carouselInner.classList.remove('is-dragging');
+
+  if (carouselDidDrag) {
+    carouselSuppressClick = true;
+    setTimeout(() => { carouselSuppressClick = false; }, 120);
+  }
+}
+
+$carouselInner.addEventListener('pointerdown', startCarouselSwipe, { passive: true });
+$carouselInner.addEventListener('pointermove', dragCarouselSwipe, { passive: false });
+$carouselInner.addEventListener('pointerup', finishCarouselSwipe, { passive: true });
+$carouselInner.addEventListener('pointercancel', (e) => {
+  if (carouselPointerId !== e.pointerId) return;
+  carouselPointerId = null;
+  carouselDidDrag = false;
+  $carouselInner.classList.remove('is-dragging');
+}, { passive: true });
+$carouselInner.addEventListener('click', (e) => {
+  if (!carouselSuppressClick) return;
+  e.preventDefault();
+  e.stopPropagation();
+  carouselSuppressClick = false;
+}, true);
+$carouselInner.addEventListener('wheel', (e) => {
+  if (!canScrollCarousel()) return;
+
+  const delta = Math.abs(e.deltaX) >= Math.abs(e.deltaY)
+    ? e.deltaX
+    : (e.shiftKey ? e.deltaY : 0);
+  if (!delta) return;
+
+  e.preventDefault();
+  carouselWheelDelta += delta;
+  if (Math.abs(carouselWheelDelta) < 44) return;
+
+  moveCarouselSelection(carouselWheelDelta > 0 ? 1 : -1);
+  carouselWheelDelta = 0;
+}, { passive: false });
 
 /* ═══════════════════════════════════════
    Carousel
