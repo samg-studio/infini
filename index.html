@@ -1036,7 +1036,7 @@ let generationRun = 0;
 let activePromptId = null;
 let latestPopIndex = -1;
 let currentRunPrompt = DEFAULT_PROMPT;
-let currentRunDimensions = { width: 1600, height: 900 };
+let currentRunDimensions = { width: 1200, height: 675 };
 let hasRemoteWork = false;
 let audioContext = null;
 let currentDemoPrompt = PROMPT_EXAMPLES[0] || DEFAULT_PROMPT;
@@ -1060,8 +1060,8 @@ function load() {
     title: gen.title || DEFAULT_PROMPT,
     imgSrc: normalizeImageSrc(gen.imgSrc),
     createdAt: gen.createdAt || Date.now(),
-    width: gen.width || 1600,
-    height: gen.height || 900
+    width: gen.width || 1200,
+    height: gen.height || 675
   }));
 }
 
@@ -1168,8 +1168,8 @@ function getComfyHost() {
 function getGenerationDimensions() {
   const isPortrait = window.innerHeight > window.innerWidth;
   return isPortrait
-    ? { width: 900, height: 1600 }
-    : { width: 1600, height: 900 };
+    ? { width: 675, height: 1200 }
+    : { width: 1200, height: 675 };
 }
 
 function applyArtOrientation(width, height) {
@@ -1403,8 +1403,8 @@ function getHistoryPrompt(historyItem) {
 function getHistoryDimensions(historyItem) {
   const latentInputs = historyItem?.prompt?.[2]?.['57:13']?.inputs || {};
   return {
-    width: Number(latentInputs.width) || 1600,
-    height: Number(latentInputs.height) || 900
+    width: Number(latentInputs.width) || 1200,
+    height: Number(latentInputs.height) || 675
   };
 }
 
@@ -2123,7 +2123,7 @@ function resetLibrary() {
   closeProgressSocket();
   latestPopIndex = -1;
   currentGenerationIndex = -1;
-  currentRunDimensions = { width: 1600, height: 900 };
+  currentRunDimensions = { width: 1200, height: 675 };
   applyArtOrientation(currentRunDimensions.width, currentRunDimensions.height);
   generations = [];
 
@@ -2267,7 +2267,7 @@ function selectGeneration(index, shouldRender = true, fromRight = false, options
 
   currentGenerationIndex = index;
   const gen = generations[index];
-  applyArtOrientation(gen.width || 1600, gen.height || 900);
+  applyArtOrientation(gen.width || 1200, gen.height || 675);
   loadMainImage(gen.imgSrc, {
     slowTransition: options.slowTransition || isFillMode,
     transitionSound: options.transitionSound || (fromRight ? (isFillMode ? 'screen' : 'transition') : '')
